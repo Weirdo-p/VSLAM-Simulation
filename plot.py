@@ -7,7 +7,7 @@ from StereoSlam import *
 from camera import *
 import numpy as np
 import os 
-import main
+import plotmain as main
 
 
 #%% init result file
