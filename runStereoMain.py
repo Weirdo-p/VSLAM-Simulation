@@ -1,14 +1,8 @@
 #%%
-
-import imp
-from turtle import pos
 from vcommon import *
 from StereoSlam import *
 from camera import *
 import numpy as np
-import os 
-import plotmain
-
 
 #%%  initialization files
 path_to_simu = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/image/"
@@ -41,7 +35,7 @@ b = 801.8527356
 cam = Camera(fx, fy, cx, cy, b)
 
 # %% set data to kalman filter
-PhiPose, QPose, QPoint, PosStd, AttStd, PointStd, PixelStd = np.identity(6),np.identity(6) * 0.1, 0.0, 0.01, 0.01, 0.001, 2
+PhiPose, QPose, QPoint, PosStd, AttStd, PointStd, PixelStd = np.identity(6),np.identity(6) * 0, 0, 3, 5 * D2R, 10, 2
 
 Slam.m_estimator.m_PhiPose = PhiPose
 Slam.m_estimator.m_QPose = QPose

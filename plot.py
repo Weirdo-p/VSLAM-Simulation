@@ -17,7 +17,7 @@ path_to_output = prefix + "result.txt"
 
 # %% plot error
 error = np.loadtxt(path_to_output)
-time = error[:, 0] / 60.0
+time = error[:, 0] / 60
 time -= time[0]
 
 # define attribute
@@ -27,7 +27,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(min)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 25]
-posAttributes["ylim"] = [-0.4, 0.4]
+posAttributes["ylim"] = [-0.1, 0.1]
 posSubAtt = {}
 posSubAtt["bplot"] = False
 posSubAtt["xpos"] = 0.25
@@ -48,7 +48,7 @@ attAttributes["xlim"] = [0, 25]
 attAttributes["ylim"] = [-1, 1]
 
 attSubAtt = {}
-attSubAtt["bplot"] = True
+attSubAtt["bplot"] = False
 attSubAtt["xpos"] = 0.5
 attSubAtt["ypos"] = 0.1
 attSubAtt["width"] = 0.35

@@ -68,7 +68,7 @@ class KalmanFilter:
         StateCov = np.identity(MapPointStateNum + 6)
         row = self.m_StateCov.shape[0]
         StateCov[:row, :row] = self.m_StateCov
-        StateCov[row:, row:] = np.identity(StateCov[row:, row:].shape[0]) * self.m_PointStd
+        StateCov[row:, row:] = np.identity(StateCov[row:, row:].shape[0]) * self.m_PointStd * self.m_PointStd
 
         # 注意： 由于状态转移矩阵为单位阵，因此一步预测的结果与系统状态一致，线性化时不必考虑
 

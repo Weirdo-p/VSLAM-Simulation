@@ -110,6 +110,8 @@ class StereoSlam:
                 tec = frame.m_pos.copy()
                 Rec = frame.m_rota.copy()
                 features = frame.m_features
+                if len(features) <= 10:
+                    print("{0}: {1} features".format(frame.m_time, len(features)))
                 self.m_estimator.filter(tec, Rec, features, self.m_camera)
                 posError = frame.m_rota @ (tec - frame.m_pos)
 

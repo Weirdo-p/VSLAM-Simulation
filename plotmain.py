@@ -38,6 +38,114 @@ marker = ['o', 's', '^']
 direc=["E", "N", "U"]
 ## for tj format
 
+def ploterror_XYZ(time, neu, save, attribute):
+    if neu.shape[0] < 1:
+        return
+    xmajorFormatter = FormatStrFormatter('%1.2f') #设置x轴标签文本的格式 
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    fig, ax = plt.subplots(figsize=(5.0393701, 3.4645669))
+    direc = attribute['legend']
+    # print(save)
+
+    cm = plt.cm.get_cmap('ocean')
+    for i in range(3):
+        plt.subplot(3, 1, i + 1)
+        # ax = plt.subplot(3, 1, i + 1)
+        # plt.tight_layout()
+        # if i != 2:
+        #     plt.setp(ax.get_xticklabels(), visible=False)
+        plt.grid(b=False, linestyle='--', color='k', alpha=0.4)
+        direc_ = neu[:, i]
+        sc = plt.scatter(time, (neu[:, i]), c=neu[:, i], ls="-", label=direc[i], linewidth=2, cmap=cm, vmin=0, vmax=11)#, marker=marker[i], markersize=4)
+
+        print(RMS(np.zeros(direc_.shape), direc_), " m")
+    plt.colorbar(sc)
+    plt.ylabel(attribute['ylabel'], labelpad=3, fontsize = 13, fontdict=font)
+    plt.yticks(size = 12, fontproperties='Cambria')
+    # plt.ylim(-3, 3)
+    legend = plt.legend(loc='upper right', fontsize = 12, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.02, 1.16), fancybox=False)
+    # plt.subplots_adjust(top=1)
+    plt.margins(x=0, y=0)
+
+    isSubplot = attribute["subplot"]["bplot"]
+
+    if isSubplot:
+        subPlotAtt = attribute["subplot"]
+        xpos, ypos, width, height = subPlotAtt["xpos"], subPlotAtt["ypos"], subPlotAtt["width"], subPlotAtt["height"]
+        axins = ax.inset_axes((xpos, ypos, width, height))
+        xlim0, xlim1, ylim0, ylim1 = subPlotAtt["xlim"][0], subPlotAtt["xlim"][1], subPlotAtt["ylim"][0], subPlotAtt["ylim"][1]
+        rangeS, rangeE = subPlotAtt["range"][0], subPlotAtt["range"][1]
+
+        for i in range (3):
+            axins.plot(time[rangeS: rangeE], (neu[rangeS: rangeE, i]) , ls="-", color=color[i], label=direc[i], linewidth=2)#, marker=marker[i], markersize=4)
+        # axins.grid(b=False, linestyle='--', color='k', alpha=0.4)
+
+        axins.set_xlim(xlim0, xlim1)
+        axins.set_ylim(ylim0, ylim1)
+        xy = (xlim0,ylim0)
+        xy2 = (xlim0,ylim1)
+        con = ConnectionPatch(xyA=xy2,xyB=xy,coordsA="data",coordsB="data",
+            axesA=axins,axesB=ax)
+        ax.add_artist(con)
+
+        xy = (xlim1,ylim0)
+        xy2 = (xlim1,ylim1)
+        con = ConnectionPatch(xyA=xy2,xyB=xy,coordsA="data",coordsB="data",
+                axesA=axins,axesB=ax)
+        ax.add_artist(con)
+
+        # 原图中画方框
+        tx0 = xlim0
+        tx1 = xlim1
+        ty0 = ylim0
+        ty1 = ylim1
+        sx = [tx0,tx1,tx1,tx0,tx0]
+        sy = [ty0,ty0,ty1,ty1,ty0]
+        ax.plot(sx,sy,"black")
+        axins.set_alpha(0)
+        axins.set_facecolor((1, 1, 1, 1))
+        # axins.ba
+        # mark_inset(ax, axins, loc1=loc1, loc2=loc2, fc="none", ec='k', lw=1)
+    ax = legend.get_frame()
+    ax.set_alpha(1)
+    ax.set_facecolor('none')
+
+    ax = plt.gca()
+    # plt.xlim(0, 12000)
+    # xmajorLocator  = MultipleLocator(1500)
+    # ymajorLocator  = MultipleLocator(5)
+
+    # ax.xaxis.set_major_locator(xmajorLocator) 
+    # ax.yaxis.set_major_locator(ymajorLocator) 
+
+    # ax.xaxis.set_major_formatter(xmajorFormatter)
+    # plt.xlim(0, 60)
+    # label = []
+    # test = plt.xticks(size = 12, fontproperties='Cambria')
+    # for i in range(0, len(test[0])):
+    #     label.append("{:.1f}".format(test[0][i] / 60 / 10))
+    
+    # plt.xticks(test[0], label, size = 12, fontproperties='Cambria')
+    # plt.margins(x=0, y=0)
+    if attribute["xlim"][0] == attribute["xlim"][1]:
+        plt.xlim(time[0], time[-1])
+    else:
+        plt.xlim(attribute["xlim"][0], attribute["xlim"][1])
+    if attribute["ylim"][0] == attribute["ylim"][1]:
+        pass
+    else:
+        plt.ylim(attribute["ylim"][0], attribute["ylim"][1])
+    # print(test)
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.subplots_adjust(left=0.175, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    plt.xlabel(attribute["xlabel"], fontdict=font)
+    plt.savefig(save, transparent=True)
+    plt.show()
+
 
 def ploterror(time, neu, save, attribute):
     if neu.shape[0] < 1:
