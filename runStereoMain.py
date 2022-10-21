@@ -3,8 +3,9 @@ from vcommon import *
 from StereoSlam import *
 from camera import *
 import numpy as np
-
+import sys
 #%%  initialization files
+sys.setrecursionlimit(3000)
 path_to_simu = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/image/"
 path_to_point = glob.glob(path_to_simu + "*.pc")[0]
 path_to_frame = glob.glob(path_to_simu + "*.fm")[0]
@@ -37,15 +38,27 @@ cam = Camera(fx, fy, cx, cy, b)
 # %% set data to kalman filter
 PhiPose, QPose, QPoint, PosStd, AttStd, PointStd, PixelStd = np.identity(6),np.identity(6) * 0, 0, 3, 5 * D2R, 10, 2
 
-Slam.m_estimator.m_PhiPose = PhiPose
-Slam.m_estimator.m_QPose = QPose
-Slam.m_estimator.m_QPoint = QPoint
+Slam.m_filter.m_PhiPose = PhiPose
+Slam.m_filter.m_QPose = QPose
+Slam.m_filter.m_QPoint = QPoint
+Slam.m_filter.m_PosStd = PosStd
+Slam.m_filter.m_AttStd = AttStd
+Slam.m_filter.m_PointStd = PointStd
+Slam.m_filter.m_PixelStd = PixelStd
+
+Slam.m_estimator.m_PixelStd = PixelStd
 Slam.m_estimator.m_PosStd = PosStd
 Slam.m_estimator.m_AttStd = AttStd
 Slam.m_estimator.m_PointStd = PointStd
-Slam.m_estimator.m_PixelStd = PixelStd
 Slam.m_camera = cam
+
+#%%
+Slam_gt = StereoSlam()
+Slam_gt.m_map.readMapFile(path_to_point)
+# print(path_to_feats)
+Slam_gt.readFrameFile(path_to_frame, path_to_feats)
+
 
 
 # %%
-Slam.runVIO(0, path_to_output)
+Slam.runVIO(1, path_to_output, Slam_gt.m_frames)

@@ -12,21 +12,21 @@ import plotmain as main
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-path_to_output = prefix + "result.txt"
+path_to_output = prefix + "result.txt.filter"
 
 
 # %% plot error
 error = np.loadtxt(path_to_output)
-time = error[:, 0] / 60
+time = error[:, 0] 
 time -= time[0]
 
 # define attribute
 plotAttributes = {}
 posAttributes = {}
 posAttributes["ylabel"] = "Error(m)"
-posAttributes["xlabel"] = "Epoch(min)"
+posAttributes["xlabel"] = "Epoch(s)"
 posAttributes["legend"] = ["R", "F", "U"]
-posAttributes["xlim"] = [0, 25]
+posAttributes["xlim"] = [0, 70]
 posAttributes["ylim"] = [-0.1, 0.1]
 posSubAtt = {}
 posSubAtt["bplot"] = False
@@ -42,10 +42,10 @@ posAttributes["subplot"] = posSubAtt
 
 attAttributes = {}
 attAttributes["ylabel"] = "Error(Deg)"
-attAttributes["xlabel"] = "Epoch(min)"
+attAttributes["xlabel"] = "Epoch(s)"
 attAttributes["legend"] = ["Y", "P", "R"]
-attAttributes["xlim"] = [0, 25]
-attAttributes["ylim"] = [-1, 1]
+attAttributes["xlim"] = [0, 70]
+attAttributes["ylim"] = [-0.3, 0.3]
 
 attSubAtt = {}
 attSubAtt["bplot"] = False
@@ -66,7 +66,7 @@ orders = ["pos", "att"]
 j = 0
 for i in range(1, len(orders) * 3 - 1, 3):
     start, end = i, i + 3
-    main.ploterror(time, error[:, start : end], prefix + "/" + orders[j] + ".svg", plotAttributes[orders[j]])
+    main.ploterror(time, error[:, start : end], prefix + "/" + orders[j] + "filter.svg", plotAttributes[orders[j]])
     print(orders[j], error[-1:, start: end] / 1593.8890000000001)
     j += 1
 
@@ -83,6 +83,6 @@ traj_gt[:, 2] = error[:, 12]
 
 trajs["GroundTruth"] = traj_gt
 trajs["VO"] = traj_vo
-main.plotTraj(time, trajs, prefix + "/" + "traj" + ".svg")
+main.plotTraj(time, trajs, prefix + "/" + "traj_filter" + ".svg")
 
 # %%

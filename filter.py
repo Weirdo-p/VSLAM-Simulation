@@ -84,7 +84,7 @@ class KalmanFilter:
         # 5. Error rectify
         tec -= state[:3, :]
         MisAngle = state[3 : 6, :]
-        Rec = (np.identity(3) + SkewSymmetricMatrix(MisAngle)) @ Rec
+        Rec = Rec @ (np.identity(3) - SkewSymmetricMatrix(MisAngle))
         # print(Rec)
         # print(tec.transpose())
         for i in range(obsnum):

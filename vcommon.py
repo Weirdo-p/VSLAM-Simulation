@@ -1,8 +1,10 @@
 from operator import matmul
+from select import select
 from unittest import TestResult
 import numpy as np
 import math
 from scipy.spatial.transform import Rotation as R
+import copy
 
 
 PI = math.pi
@@ -22,6 +24,17 @@ class Frame:
         self.m_features  =  []                   # features
         self.m_time      = 0
 
+    def __deepcopy__(self, memo):
+        print("frame copy")
+        dup = Frame(copy.deepcopy(self.m_id, memo))
+        memo[self] = dup
+        dup.m_features = copy.deepcopy(self.m_features)
+        dup.m_pos = copy.deepcopy(self.m_pos)
+        dup.m_rota = copy.deepcopy(self.m_rota)
+        dup.m_time = copy.deepcopy(self.m_time)
+        return dup
+
+
 
 class Feature:
     def __init__(self, pos = np.zeros([3, 1]), du = 0, mapPointId = -1):
@@ -31,12 +44,31 @@ class Feature:
         self.m_mappoint = None
         self.m_frame = None
 
+    def __deepcopy__(self, memo):
+        print("feature copy")
+        dup = Feature(copy.deepcopy(self.m_mapPointId, memo))
+        memo[self] = dup
+
+        dup.m_du = copy.deepcopy(self.m_du)
+        dup.m_pos = copy.deepcopy(self.m_pos)
+        dup.m_frame = copy.deepcopy(self.m_frame)
+        dup.m_mappoint = copy.deepcopy(self.m_mappoint)
+        return dup
+        
 
 class MapPoint:
     def __init__(self, pos = np.zeros([3, 1]), mapPointId = -1):
         self.m_pos  = pos                       # 三维点世界坐标系的坐标
         self.m_id   = mapPointId                # ID              
         self.m_obs  = []                        # observations (features)
+
+    def __deepcopy__(self, memo):
+        print("mappoint copy")
+        dup = MapPoint(copy.deepcopy(self.m_id, memo))
+        dup.m_pos = copy.deepcopy(self.m_pos)
+        dup.m_obs = copy.deepcopy(self.m_obs)
+
+        return dup
 
 
 class Map:

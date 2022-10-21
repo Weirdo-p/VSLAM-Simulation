@@ -175,7 +175,7 @@ def ploterror(time, neu, save, attribute):
     plt.margins(x=0, y=0)
 
     isSubplot = attribute["subplot"]["bplot"]
-
+    # plt.ticklabel_format(style='sci',scilimits=(0,0),axis='y')
     if isSubplot:
         subPlotAtt = attribute["subplot"]
         xpos, ypos, width, height = subPlotAtt["xpos"], subPlotAtt["ypos"], subPlotAtt["width"], subPlotAtt["height"]
@@ -293,8 +293,8 @@ def plotTraj(time, trajs={ }, save='./'):
     ax.set_facecolor('none')
     xmajorLocator  = MultipleLocator(30)
     ymajorLocator  = MultipleLocator(10)
-    plt.ylim(-30, 30)
-    plt.xlim(-30, 30)
+    plt.ylim(-40, 40)
+    plt.xlim(-40, 40)
     plt.ylabel("m", fontdict=font_)
     plt.xlabel("m", fontdict=font_)
     plt.subplot(gs[9:, 1:])
@@ -304,13 +304,13 @@ def plotTraj(time, trajs={ }, save='./'):
     for key in trajs.keys():
         plt.plot(time, trajs[key][:, 2], label=key, color=color[i])
         i += 1
-    plt.xlim(0, 25)
-    plt.ylim(-20, 20)
+    plt.xlim(0, 70)
+    plt.ylim(-25, 25)
     plt.grid(b=False, linestyle='--', color='k', alpha=0.4)
     # ax.xaxis.set_major_locator(x_major_locator)
     # ax.yaxis.set_major_locator(y_major_locator)
     plt.ylabel("Height(m)", fontdict=font_)
-    plt.xlabel("Epoch(min)", fontdict=font_)
+    plt.xlabel("Epoch(s)", fontdict=font_)
     # plt.margins(x=0, y=0.00)
     plt.savefig(save, transparent=True)
     plt.show()
