@@ -15,14 +15,20 @@ class CLS:
         self.m_MapPoints_Point = {}
         self.m_estimateFrame = []
 
-    def solveAll(self, frames, camera):
+    def solveAll(self, frames, camera, maxtime = -1):
+        self.m_MapPoints = {}       # position of mappoint in state vector
+        self.m_MapPointPos = 0      # [cameraPos CameraRotation point1 ... pointN]
+        self.m_MapPoints_Point = {}
+        self.m_estimateFrame = []
         obsnum, statenum = 0, 0
-        print(id(frames))
         # count for observations and state
-        count = 0
+        LastTime = maxtime
+        if maxtime > frames[len(frames) - 1].m_time or maxtime == -1:
+            LastTime = frames[len(frames) - 1].m_time
+
         for frame in frames:
-            # if frame.m_time >= 10:
-            #     break
+            if frame.m_time > LastTime:
+                break
             features = frame.m_features
             obsnum += len(features) * 3
             self.__addFeatures(features)
@@ -34,7 +40,10 @@ class CLS:
         StateFrameNum = len(self.m_estimateFrame) * 6
 
         B, L = np.zeros((obsnum, statenum)), np.zeros((obsnum, 1))
-        print(obsnum, statenum)
+        if statenum >= obsnum:
+            print("obs num not enough")
+            exit(-1)
+        # print(obsnum, statenum)
         
         fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
         iter, MaxIter = 0, 10
@@ -82,12 +91,12 @@ class CLS:
             P = np.identity(obsnum + statenum)
             row_P = 0
             p = np.identity(6)
-            p[:3, :3] *= self.m_PosStd * self.m_PosStd
-            p[3:6, 3:6] *= self.m_AttStd * self.m_AttStd
+            p[:3, :3] *= (self.m_PosStd * self.m_PosStd)
+            p[3:6, 3:6] *= (self.m_AttStd * self.m_AttStd)
             while True:
                 P[row_P:row_P + 6, row_P:row_P + 6] = p
                 row_P += 6
-                if row_P >= P.shape[0]-6:
+                if row_P >= P.shape[0] - 6:
                     break
 
             P[posStateNum:posStateNum + pointStateNum, posStateNum:posStateNum + pointStateNum] = np.identity(pointStateNum) * self.m_PointStd * self.m_PointStd
@@ -101,7 +110,7 @@ class CLS:
             for i in range(len(self.m_estimateFrame)):
                 frameDX = dx[i * 6: (i + 1) * 6, :]
                 self.m_estimateFrame[i].m_pos = self.m_estimateFrame[i].m_pos - frameDX[0: 3]
-                self.m_estimateFrame[i].m_rota = self.m_estimateFrame[i].m_rota @ (np.identity(3) - SkewSymmetricMatrix(frameDX[3: 6]))
+                self.m_estimateFrame[i].m_rota = self.m_estimateFrame[i].m_rota @ (np.identity(3) + SkewSymmetricMatrix(frameDX[3: 6]))
             
                 
             for id_ in self.m_MapPoints.keys():
@@ -115,10 +124,11 @@ class CLS:
                 print(np.max(np.abs(dx[:posStateNum, :] - dXLast[:posStateNum, :])))
 
 
-            if iter != 0 and (np.linalg.norm(dx[:posStateNum] - dXLast[:posStateNum], 2) < 1e-2 or np.max(np.abs(dx[:posStateNum, :] - dXLast[:posStateNum, :])) < 5E-2):
+            if iter != 0 and (np.linalg.norm(dx[:posStateNum] - dXLast[:posStateNum], 2) < 1e-2 or np.max(np.abs(dx[:posStateNum, :] - dXLast[:posStateNum, :])) < 1E-2):
                 break
             
             dXLast = copy.deepcopy(dx)
+            break
         
         return self.m_estimateFrame
 

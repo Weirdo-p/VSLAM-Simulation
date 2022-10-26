@@ -1,25 +1,6 @@
-#%%
-
-import imp
-from turtle import pos
-from vcommon import *
-from StereoSlam import *
-from camera import *
 import numpy as np
-import os 
 import plotmain as main
-
-
-#%% init result file
-prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-name = "result.txt.10s.filter"
-path_to_output = prefix + name
-
-
-# %% plot error
-error = np.loadtxt(path_to_output)
-time = error[:, 0] 
-time -= time[0]
+import glob
 
 # define attribute
 plotAttributes = {}
@@ -27,7 +8,7 @@ posAttributes = {}
 posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(s)"
 posAttributes["legend"] = ["R", "F", "U"]
-posAttributes["xlim"] = [0, 10]
+posAttributes["xlim"] = [0, 30]
 posAttributes["ylim"] = [-0.1, 0.1]
 posSubAtt = {}
 posSubAtt["bplot"] = False
@@ -45,7 +26,7 @@ attAttributes = {}
 attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(s)"
 attAttributes["legend"] = ["Y", "P", "R"]
-attAttributes["xlim"] = [0, 70]
+attAttributes["xlim"] = [0, 30]
 attAttributes["ylim"] = [-0.3, 0.3]
 
 attSubAtt = {}
@@ -64,26 +45,36 @@ plotAttributes['pos'] = posAttributes
 plotAttributes['att'] = attAttributes
 
 orders = ["pos", "att"]
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
+cmp = "CLS_FilterAll"
+names = [".CLS", ".filter"]
+
+errors = {}
+
+SortFunc = lambda name, name1: float(name[78: len(name) - len(name1) - 1])
+for i in range(len(names)):
+    Files = glob.glob(prefix + "*" + names[i])
+    Files = sorted(Files, key=lambda name: float(name[78: len(name) - len(names[i]) - 1]))
+
+    error = []
+
+    for file in Files:
+        data = np.loadtxt(file)
+        print(data[-1:, ].shape)
+        error.append(data[-1:, ])
+    
+    errors[names[i]] = np.array(error)
+    dim1, dim2 = errors[names[i]].shape[0], errors[names[i]].shape[2]
+    errors[names[i]] = errors[names[i]].reshape(dim1, dim2)
+
+compare = errors[names[0]][:, 1:] - errors[names[1]][:, 1:]
+# print(errors[names[0]].reshape(dim1, dim2))
+time = errors[names[0]][:, 0]
+
+orders = ["pos", "att"]
 j = 0
 for i in range(1, len(orders) * 3 - 1, 3):
     start, end = i, i + 3
-    main.ploterror(time, error[:, start : end], prefix + "/" + orders[j] + name + ".svg", plotAttributes[orders[j]])
-    print(orders[j], error[-1:, start: end] / 1593.8890000000001)
+    main.ploterror(time, compare[:, start : end], prefix + "/" + orders[j] + cmp + ".svg", plotAttributes[orders[j]])
+    print(orders[j], compare[-1:, start: end] / 1593.8890000000001)
     j += 1
-
-trajs = {}
-traj_vo = error[:, 7 : 10]
-traj_vo[:, 1] = traj_vo[:, 2]
-traj_vo[:, 2] = error[:, 9]
-traj_vo[:, 1] += 2
-traj_vo[:, 2] += 5
-
-traj_gt = error[:, 10: ]
-traj_gt[:, 1] = traj_gt[:, 2]
-traj_gt[:, 2] = error[:, 12]
-
-trajs["GroundTruth"] = traj_gt
-trajs["VO"] = traj_vo
-main.plotTraj(time, trajs, prefix + "/" + "traj_" + name + ".svg")
-
-# %%
