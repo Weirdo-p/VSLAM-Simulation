@@ -7,10 +7,16 @@ import sys
 #%%  initialization files
 sys.setrecursionlimit(3000)
 path_to_simu = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/image/"
-path_to_point = glob.glob(path_to_simu + "*.pc")[0]
-path_to_frame = glob.glob(path_to_simu + "*.fm")[0]
+path_to_point = glob.glob(path_to_simu + "*.pc.noise")[0]
+path_to_frame = glob.glob(path_to_simu + "*.fm.noise")[0]
 path_to_feats = glob.glob(path_to_simu + "*.txt")
 path_to_feats = sorted(path_to_feats, key=lambda name: int(name[len(path_to_simu): len(name) - 4]))
+
+# read ground truth file
+path_to_point_gt = glob.glob(path_to_simu + "*.pc")[0]
+path_to_frame_gt = glob.glob(path_to_simu + "*.fm")[0]
+path_to_feats_gt = glob.glob(path_to_simu + "*.txt")
+path_to_feats_gt = sorted(path_to_feats_gt, key=lambda name: int(name[len(path_to_simu): len(name) - 4]))
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
@@ -25,17 +31,17 @@ path_to_output = prefix + "result.txt"
 
 #%%
 Slam_gt = StereoSlam()
-Slam_gt.m_map.readMapFile(path_to_point)
+Slam_gt.m_map.readMapFile(path_to_point_gt)
 # print(path_to_feats)
-Slam_gt.readFrameFile(path_to_frame, path_to_feats)
+Slam_gt.readFrameFile(path_to_frame_gt, path_to_feats_gt)
 
 # %%
-time, step = 1,  0.5
-while time <= 30:
+time, step = -1,  0.2
+while time <= -1:
     Slam = StereoSlam()
-    Slam.m_map.readMapFile(path_to_point)
+    Slam.m_map.readMapFile(path_to_point_gt)
     # print(path_to_feats)
-    Slam.readFrameFile(path_to_frame, path_to_feats)
+    Slam.readFrameFile(path_to_frame_gt, path_to_feats_gt)
 
     # %% try reprojection to validate data and init camera
     fx = 1.9604215879672799e+03
@@ -46,7 +52,7 @@ while time <= 30:
     cam = Camera(fx, fy, cx, cy, b)
 
     # %% set data to kalman filter
-    PhiPose, QPose, QPoint, PosStd, AttStd, PointStd, PixelStd = np.identity(6),np.identity(6) * 0, 0, 1.714, 0.091, 10, 2
+    PhiPose, QPose, QPoint, PosStd, AttStd, PointStd, PixelStd = np.identity(6),np.identity(6) * 0, 0, 10, 10 * D2R, 10, 2
 
     Slam.m_filter.m_PhiPose = PhiPose
     Slam.m_filter.m_QPose = QPose
@@ -61,5 +67,5 @@ while time <= 30:
     Slam.m_estimator.m_AttStd = AttStd
     Slam.m_estimator.m_PointStd = PointStd
     Slam.m_camera = cam
-    Slam.runVIO(1, path_to_output, Slam_gt.m_frames,time)
+    Slam.runVIO(2, path_to_output, Slam_gt.m_frames,time, False)
     time += step

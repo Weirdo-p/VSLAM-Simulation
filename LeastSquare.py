@@ -16,10 +16,6 @@ class CLS:
         self.m_estimateFrame = []
 
     def solveAll(self, frames, camera, maxtime = -1):
-        self.m_MapPoints = {}       # position of mappoint in state vector
-        self.m_MapPointPos = 0      # [cameraPos CameraRotation point1 ... pointN]
-        self.m_MapPoints_Point = {}
-        self.m_estimateFrame = []
         obsnum, statenum = 0, 0
         # count for observations and state
         LastTime = maxtime
@@ -43,12 +39,25 @@ class CLS:
         if statenum >= obsnum:
             print("obs num not enough")
             exit(-1)
-        # print(obsnum, statenum)
+        print(obsnum, statenum)
         
         fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
         iter, MaxIter = 0, 10
 
         dXLast, P = 0, 0
+        P = np.identity(obsnum + statenum)
+        row_P = 0
+        p = np.identity(6)
+        p[:3, :3] *= (self.m_PosStd * self.m_PosStd)
+        p[3:6, 3:6] *= (self.m_AttStd * self.m_AttStd)
+        while True:
+            P[row_P:row_P + 6, row_P:row_P + 6] = p
+            row_P += 6
+            if row_P >= P.shape[0] - 6:
+                break
+        P[posStateNum:posStateNum + pointStateNum, posStateNum:posStateNum + pointStateNum] = np.identity(pointStateNum) * self.m_PointStd * self.m_PointStd
+        P = np.linalg.inv(P)
+
         for iter in range(MaxIter):
             # form design matrix and residuals
             frame_i, obs_i = 0, 0
@@ -88,29 +97,18 @@ class CLS:
             L_all[: statenum, :] = np.zeros((statenum, 1))
             L_all[statenum:, :] = L
 
-            P = np.identity(obsnum + statenum)
-            row_P = 0
-            p = np.identity(6)
-            p[:3, :3] *= (self.m_PosStd * self.m_PosStd)
-            p[3:6, 3:6] *= (self.m_AttStd * self.m_AttStd)
-            while True:
-                P[row_P:row_P + 6, row_P:row_P + 6] = p
-                row_P += 6
-                if row_P >= P.shape[0] - 6:
-                    break
-
-            P[posStateNum:posStateNum + pointStateNum, posStateNum:posStateNum + pointStateNum] = np.identity(pointStateNum) * self.m_PointStd * self.m_PointStd
-            P[statenum:, statenum:] = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd   
-            P = np.linalg.inv(P)
             print("calculate dx")
-
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/H_CLS.txt", B_all)
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_CLS.txt", L_all)
+            # break
+            P[statenum:, statenum:] = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd   
             dx = np.linalg.inv(B_all.transpose() @ P @ B_all) @ B_all.transpose() @ P @ L_all
             print("one loop done")
-
+            # print(dx)
             for i in range(len(self.m_estimateFrame)):
                 frameDX = dx[i * 6: (i + 1) * 6, :]
                 self.m_estimateFrame[i].m_pos = self.m_estimateFrame[i].m_pos - frameDX[0: 3]
-                self.m_estimateFrame[i].m_rota = self.m_estimateFrame[i].m_rota @ (np.identity(3) + SkewSymmetricMatrix(frameDX[3: 6]))
+                self.m_estimateFrame[i].m_rota = self.m_estimateFrame[i].m_rota @ (np.identity(3) - SkewSymmetricMatrix(frameDX[3: 6]))
             
                 
             for id_ in self.m_MapPoints.keys():
@@ -128,6 +126,9 @@ class CLS:
                 break
             
             dXLast = copy.deepcopy(dx)
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/P.txt", np.linalg.inv(P))
+            # P = np.linalg.inv(P)
+            # P[:statenum, :statenum] = np.linalg.inv(B_all.transpose() @ P @ B_all)
             break
         
         return self.m_estimateFrame

@@ -47,7 +47,7 @@ plotAttributes['att'] = attAttributes
 orders = ["pos", "att"]
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
 cmp = "CLS_FilterAll"
-names = [".CLS", ".filter"]
+names = [".CLS", ".FilterAllState"]
 
 errors = {}
 
@@ -67,6 +67,7 @@ for i in range(len(names)):
     dim1, dim2 = errors[names[i]].shape[0], errors[names[i]].shape[2]
     errors[names[i]] = errors[names[i]].reshape(dim1, dim2)
 
+print(errors[names[0]][:, 1:])
 compare = errors[names[0]][:, 1:] - errors[names[1]][:, 1:]
 # print(errors[names[0]].reshape(dim1, dim2))
 time = errors[names[0]][:, 0]

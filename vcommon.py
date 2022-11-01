@@ -168,7 +168,7 @@ def Jacobian_phai(Rec, tec, XYZ, xyz, fx, fy, b):
     """
 
     Jpoint = Jacobian_ppoint(fx, fy, b, xyz)
-    Jphi = SkewSymmetricMatrix(np.matmul(Rec, tec - XYZ))
+    Jphi = Rec @ SkewSymmetricMatrix(tec - XYZ)
 
     return matmul(Jpoint, Jphi)
 

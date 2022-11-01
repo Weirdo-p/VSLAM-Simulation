@@ -87,7 +87,7 @@ class StereoSlam:
         mappoint.m_obs.append(feature)
         return feature
 
-    def runVIO(self, mode = 0, path_to_output = "./", frames_gt=[], maxtime=-1):
+    def runVIO(self, mode = 0, path_to_output = "./", frames_gt=[], maxtime=-1, bNoiseData = False):
         """Run VIO for an epoch
 
         Args:
@@ -96,12 +96,12 @@ class StereoSlam:
         if mode == 0:
             self.runVIOWithoutError(path_to_output, maxtime)
         elif mode == 1:
-            return self.runVIOWithoutError_CLS(path_to_output, frames_gt, maxtime)
+            return self.runVIOWithoutError_CLS(path_to_output, frames_gt, maxtime, bNoiseData)
         elif mode == 2:
-            return self.runVIOWithoutError_FilterAllState(path_to_output, frames_gt, maxtime)
+            return self.runVIOWithoutError_FilterAllState(path_to_output, frames_gt, maxtime, bNoiseData)
 
 
-    def runVIOWithoutError(self, path_to_output, maxtime=-1):
+    def runVIOWithoutError(self, path_to_output, maxtime=-1, bNoiseData = False):
         """Run VIO without linearization error
         """
         firstTec, firstRec = 0, 0
@@ -168,7 +168,7 @@ class StereoSlam:
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
 
 
-    def runVIOWithoutError_CLS(self, path_to_output, frames_gt, maxtime=-1):
+    def runVIOWithoutError_CLS(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False):
         """Run VIO without liearization error and use Common Least Square method
 
         Args:
@@ -180,11 +180,16 @@ class StereoSlam:
         if maxtime > self.m_frames[len(self.m_frames) - 1].m_time or maxtime == -1:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time
 
-        f = open(path_to_output + "."+str(maxtime)+"s.CLS", "w")
+        if bNoiseData:
+            output = path_to_output + "."+str(maxtime)+"s.CLS.Noise"
+        else:
+            output = path_to_output + "."+str(maxtime)+"s.CLS"
+
+        f = open(output, "w")
         f.close()
 
         count, frame_i = 0, 0
-        with open(path_to_output + "."+str(maxtime)+"s.CLS", "a") as f:
+        with open(output, "a") as f:
             for frame_estimate in frames_estimate:
                 if frame_estimate.m_time > LastTime:
                     break
@@ -229,16 +234,22 @@ class StereoSlam:
                 frame_i += 1
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
 
-    def runVIOWithoutError_FilterAllState(self, path_to_output, frames_gt, maxtime=-1):
+    def runVIOWithoutError_FilterAllState(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False):
         frames_estimate = self.m_filter.filter_AllState(self.m_frames, self.m_camera, maxtime)
         LastTime = maxtime
         if maxtime > self.m_frames[len(self.m_frames) - 1].m_time or maxtime == -1:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time
-        f = open(path_to_output + "." + str(maxtime) + "s.FilterAllState", "w")
+
+        if bNoiseData:
+            output = path_to_output + "."+str(maxtime)+"s.FilterAllState.Noise"
+        else:
+            output = path_to_output + "."+str(maxtime)+"s.FilterAllState"
+
+        f = open(output, "w")
         f.close()
 
         count, frame_i = 0, 0
-        with open(path_to_output + "." + str(maxtime) + "s.FilterAllState", "a") as f:
+        with open(output, "a") as f:
             for frame_estimate in frames_estimate:
                 if frame_estimate.m_time > LastTime:
                     break

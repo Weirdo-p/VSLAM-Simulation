@@ -12,7 +12,7 @@ import plotmain as main
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-name = "result.txt.10s.filter"
+name = "result.txt.-1s.FilterAllState"
 path_to_output = prefix + name
 
 
@@ -27,7 +27,7 @@ posAttributes = {}
 posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(s)"
 posAttributes["legend"] = ["R", "F", "U"]
-posAttributes["xlim"] = [0, 10]
+posAttributes["xlim"] = [0, 70]
 posAttributes["ylim"] = [-0.1, 0.1]
 posSubAtt = {}
 posSubAtt["bplot"] = False
@@ -36,7 +36,7 @@ posSubAtt["ypos"] = 0.08
 posSubAtt["width"] = 0.4
 posSubAtt["height"] = 0.3
 posSubAtt["range"] = 4000, 6500
-posSubAtt["ylim"] = [-0.1, 0.1]
+posSubAtt["ylim"] = [0.1, 0.1]
 posSubAtt["xlim"] = [450, 650]
 posSubAtt["loc"] = [3, 4]
 posAttributes["subplot"] = posSubAtt
