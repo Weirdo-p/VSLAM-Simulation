@@ -46,7 +46,7 @@ attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(s)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 70]
-attAttributes["ylim"] = [-0.3, 0.3]
+attAttributes["ylim"] = [-0.1, 0.1]
 
 attSubAtt = {}
 attSubAtt["bplot"] = False

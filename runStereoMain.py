@@ -67,5 +67,5 @@ while time <= -1:
     Slam.m_estimator.m_AttStd = AttStd
     Slam.m_estimator.m_PointStd = PointStd
     Slam.m_camera = cam
-    Slam.runVIO(2, path_to_output, Slam_gt.m_frames,time, False)
+    Slam.runVIO(1, path_to_output, Slam_gt.m_frames,time, False)
     time += step
