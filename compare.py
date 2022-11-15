@@ -47,7 +47,7 @@ plotAttributes['att'] = attAttributes
 orders = ["pos", "att"]
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
 cmp = "CLS_FilterAll"
-names = [".FilterAllState", ".CLS"]
+names = [".CLS", ".FilterAllState"]
 
 errors = {}
 
@@ -60,31 +60,22 @@ for i in range(len(names)):
 
     for file in Files:
         data = np.loadtxt(file)
-        # print(data[-1:, ].shape)
+        print(data[-1:, ].shape)
         error.append(data[-1:, ])
-        print(file, data[-1:, 1])
     
     errors[names[i]] = np.array(error)
     dim1, dim2 = errors[names[i]].shape[0], errors[names[i]].shape[2]
     errors[names[i]] = errors[names[i]].reshape(dim1, dim2)
-    break
 
-# print(errors[names[0]][:, 1])
-# print(errors[names[1]][:, 1])
-# compare = errors[names[0]][:, 1:] - errors[names[1]][:, 1:]
-# # print(errors[names[0]].reshape(dim1, dim2))
-# time = errors[names[0]][:, 0]
+print(errors[names[0]][:, 1:])
+compare = errors[names[0]][:, 1:] - errors[names[1]][:, 1:]
+# print(errors[names[0]].reshape(dim1, dim2))
+time = errors[names[0]][:, 0]
 
-# orders = ["pos", "att"]
-# j = 0
-# for i in range(1, len(orders) * 3 - 1, 3):
-#     start, end = i, i + 3
-#     main.ploterror(time, compare[:, start : end], prefix + "/" + orders[j] + cmp + ".svg", plotAttributes[orders[j]])
-#     print(orders[j], compare[-1:, start: end] / 1593.8890000000001)
-#     j += 1
-
-
-# cov_CLS = np.loadtxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov_CLS.txt")
-# cov_Filter = np.loadtxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/CovFilter.txt")
-
-# np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov_Compare.txt", cov_CLS - cov_Filter)
+orders = ["pos", "att"]
+j = 0
+for i in range(1, len(orders) * 3 - 1, 3):
+    start, end = i, i + 3
+    main.ploterror(time, compare[:, start : end], prefix + "/" + orders[j] + cmp + ".svg", plotAttributes[orders[j]])
+    print(orders[j], compare[-1:, start: end] / 1593.8890000000001)
+    j += 1

@@ -143,7 +143,7 @@ class KalmanFilter:
 
         return jaco, l
 
-    def     filter_AllState(self, frames, camera, frames_gt, maxtime=-1):
+    def filter_AllState(self, frames, camera, frames_gt, maxtime=-1):
         LastTime = maxtime
         if maxtime > frames[len(frames) - 1].m_time or maxtime == -1:
             LastTime = frames[len(frames) - 1].m_time
@@ -167,6 +167,7 @@ class KalmanFilter:
         statenum = len(self.m_estimateFrame) * 6 + len(self.m_MapPoints) * 3
         pointStateNum = len(self.m_MapPoints) * 3
         StateFrameNum = len(self.m_estimateFrame) * 6
+        
 
         # init KF matrix
         Phi = np.identity(statenum)     # state transition matrix
@@ -196,7 +197,7 @@ class KalmanFilter:
         self.m_StateCov[StateFrameNum:, StateFrameNum:] = np.identity(pointStateNum) * (self.m_PointStd ** 2)
         
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/CovFilter.txt", self.m_StateCov)
-
+        state = 0
         for i in range(len(self.m_estimateFrame)):
             gt = frames_gt[i]
             frame = self.m_estimateFrame[i]
@@ -217,6 +218,7 @@ class KalmanFilter:
             tmp = (np.identity(K.shape[0]) - K @ J)
             CovTmp = tmp @ state_cov_pre
 
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV.txt")
             # test covariance matrix
             # tmp = np.linalg.inv(np.linalg.inv(state_cov_pre) + J.transpose() @ W @ J)
             # CovTmp = tmp
@@ -232,14 +234,14 @@ class KalmanFilter:
             #     self.m_MapPoints_Point[MapPointID].m_pos = self.m_MapPoints_Point[MapPointID].m_pos - state[StateFrameNum + MapPointPos: StateFrameNum + MapPointPos + 3, :]
 
             # update all frames
-            for j in range(len(self.m_estimateFrame)):  
+            for j in range(len(self.m_estimateFrame)): 
                 self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
                 self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-
+            # print(state)
             # for id_ in self.m_MapPoints.keys():
-
             #     position = self.m_MapPoints[id_]
             #     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+
         return frames
             
 
