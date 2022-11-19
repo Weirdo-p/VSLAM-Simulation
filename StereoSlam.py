@@ -101,6 +101,8 @@ class StereoSlam:
             return self.runVIOWithoutError_FilterAllState(path_to_output, frames_gt, maxtime, bNoiseData)
         elif mode == 3:
             return self.runVIOWithoutError_CLS_Sequential(path_to_output, frames_gt, maxtime, bNoiseData)
+        elif mode == 4:
+            return self.runVIOWithoutError_FilterAllState_Window(path_to_output, frames_gt, maxtime, bNoiseData)
 
 
     def runVIOWithoutError(self, path_to_output, maxtime=-1, bNoiseData = False):
@@ -311,6 +313,67 @@ class StereoSlam:
         f = open(output, "w")
         f.close()
 
+        count, frame_i = 0, 0
+        with open(output, "a") as f:
+            for frame_estimate in frames_estimate:
+                if frame_estimate.m_time > LastTime:
+                    break
+                if count == 0:
+                    firstTec = frames_gt[0].m_pos.copy()
+                    firstRec = frames_gt[0].m_rota.copy()
+                    count += 1
+                frame = frames_gt[frame_i]
+                posError = frame.m_rota @ (frame_estimate.m_pos - frame.m_pos)
+
+                Rcb = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]]).transpose()
+                BLH = XYZ2BLH(frame_estimate.m_pos)
+                BLH[:2] *= D2R
+                Rne = BLH2NEU(BLH)
+                Rnc = Rcb @ frame_estimate.m_rota @ Rne
+                att = rot2att(Rnc) * R2D
+
+                BLH_gt = XYZ2BLH(frame.m_pos)
+                BLH_gt[:2] *= D2R
+                Rne_gt = BLH2NEU(BLH_gt)
+                Rnc_gt = Rcb @ frame.m_rota @ Rne_gt
+                att_gt = rot2att(Rnc_gt) * R2D
+
+                attError = att - att_gt
+                if math.fabs(attError[0]) > 50:
+                    print(att, att_gt)
+
+                    if att_gt[0] > 150:
+                        att_gt[0] -= 180
+                    if att_gt[0] < -150:
+                        att_gt[0] += 180
+
+                    if att[0] > 150:
+                        att[0] -= 180
+                    if att[0] < -150:
+                        att[0] += 180
+                    attError = att - att_gt
+                    print(att, att_gt)
+
+                position = firstRec @ (frame_estimate.m_pos - firstTec)
+                gt_position = firstRec @ (frame.m_pos - firstTec)
+                frame_i += 1
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
+
+    def runVIOWithoutError_FilterAllState_Window(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False):
+        frames_estimate = self.m_filter.filter_AllState_Window(self.m_frames, self.m_camera, frames_gt, maxtime)
+        LastTime = maxtime
+        if maxtime > self.m_frames[len(self.m_frames) - 1].m_time or maxtime == -1:
+            LastTime = self.m_frames[len(self.m_frames) - 1].m_time
+
+        if bNoiseData:
+            output = path_to_output + "."+str(maxtime)+"s.FilterAllState_Window.Noise"
+        else:
+            output = path_to_output + "."+str(maxtime)+"s.FilterAllState_Window"
+
+        f = open(output, "w")
+        f.close()
+
+        count, frame_i = 0, 0
         count, frame_i = 0, 0
         with open(output, "a") as f:
             for frame_estimate in frames_estimate:

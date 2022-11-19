@@ -186,7 +186,7 @@ class CLS:
         self.m_StateCov = np.linalg.inv(self.m_StateCov)
         
         N, w = 0, 0
-        state = 0
+        state = np.zeros((statenum, 1))
         for i in range(len(self.m_estimateFrame)):
             frame = self.m_estimateFrame[i]
             tec, Rec = frame.m_pos, frame.m_rota
@@ -200,10 +200,12 @@ class CLS:
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/W_FILTER_" + str(i) + ".txt", W)
             print("Process " + str(i) + "th frame")
             N = J.transpose() @ W @ J + self.m_StateCov
-            w += J.transpose() @ W @ l
+            w = J.transpose() @ W @ l + self.m_StateCov @ state
 
             self.m_StateCov = N
-        state = np.linalg.inv(N ) @ w
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV_CLS.txt", np.linalg.inv(self.m_StateCov))
+            state = np.linalg.inv(N ) @ w
+            # break
         # update current frame
         # FramedX = state[i * 6: i * 6 + 6, :]
         # self.m_estimateFrame[i].m_pos = self.m_estimateFrame[i].m_pos - FramedX[0: 3]

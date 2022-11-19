@@ -11,6 +11,8 @@ from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.patches import ConnectionPatch
+from matplotlib import ticker
+
 
 def RMS(gt, obs):
     rms = np.sqrt(((gt - obs) ** 2).sum() / gt.shape[0])
@@ -147,7 +149,7 @@ def ploterror_XYZ(time, neu, save, attribute):
     plt.show()
 
 
-def ploterror(time, neu, save, attribute):
+def ploterror(time, neu, save, attribute, isSubplot):
     if neu.shape[0] < 1:
         return
     xmajorFormatter = FormatStrFormatter('%1.2f') #设置x轴标签文本的格式 
@@ -174,50 +176,34 @@ def ploterror(time, neu, save, attribute):
     # plt.subplots_adjust(top=1)
     plt.margins(x=0, y=0)
 
-    isSubplot = attribute["subplot"]["bplot"]
-    # plt.ticklabel_format(style='sci',scilimits=(0,0),axis='y')
     if isSubplot:
         subPlotAtt = attribute["subplot"]
         xpos, ypos, width, height = subPlotAtt["xpos"], subPlotAtt["ypos"], subPlotAtt["width"], subPlotAtt["height"]
         axins = ax.inset_axes((xpos, ypos, width, height))
-        xlim0, xlim1, ylim0, ylim1 = subPlotAtt["xlim"][0], subPlotAtt["xlim"][1], subPlotAtt["ylim"][0], subPlotAtt["ylim"][1]
         rangeS, rangeE = subPlotAtt["range"][0], subPlotAtt["range"][1]
-
         for i in range (3):
             axins.plot(time[rangeS: rangeE], (neu[rangeS: rangeE, i]) , ls="-", color=color[i], label=direc[i], linewidth=2)#, marker=marker[i], markersize=4)
         # axins.grid(b=False, linestyle='--', color='k', alpha=0.4)
-
-        axins.set_xlim(xlim0, xlim1)
-        axins.set_ylim(ylim0, ylim1)
-        xy = (xlim0,ylim0)
-        xy2 = (xlim0,ylim1)
-        con = ConnectionPatch(xyA=xy2,xyB=xy,coordsA="data",coordsB="data",
-            axesA=axins,axesB=ax)
-        ax.add_artist(con)
-
-        xy = (xlim1,ylim0)
-        xy2 = (xlim1,ylim1)
-        con = ConnectionPatch(xyA=xy2,xyB=xy,coordsA="data",coordsB="data",
-                axesA=axins,axesB=ax)
-        ax.add_artist(con)
-
-        # 原图中画方框
-        tx0 = xlim0
-        tx1 = xlim1
-        ty0 = ylim0
-        ty1 = ylim1
-        sx = [tx0,tx1,tx1,tx0,tx0]
-        sy = [ty0,ty0,ty1,ty1,ty0]
-        ax.plot(sx,sy,"black")
-        axins.set_alpha(0)
-        axins.set_facecolor((1, 1, 1, 1))
-        # axins.ba
-        # mark_inset(ax, axins, loc1=loc1, loc2=loc2, fc="none", ec='k', lw=1)
+        
+        ylimS, ylimE = subPlotAtt["ylim"][0], subPlotAtt["ylim"][1]
+        axins.set_xlim(subPlotAtt["xlim"][0], subPlotAtt["xlim"][1])
+        axins.set_ylim(ylimS, ylimE)
+        # mark_inset()
+        loc1, loc2 = subPlotAtt["loc"][0], subPlotAtt["loc"][1]
+        mark_inset(ax, axins, loc1=loc1, loc2=loc2, fc="none", ec='k', lw=1)
     ax = legend.get_frame()
     ax.set_alpha(1)
     ax.set_facecolor('none')
 
     ax = plt.gca()
+    
+    if attribute["scientific"]:
+        # scientific expression
+        formatter = ticker.ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True) 
+        formatter.set_powerlimits((0,0)) 
+        ax.yaxis.set_major_formatter(formatter)
+
     # plt.xlim(0, 12000)
     # xmajorLocator  = MultipleLocator(1500)
     # ymajorLocator  = MultipleLocator(5)
@@ -234,20 +220,16 @@ def ploterror(time, neu, save, attribute):
     
     # plt.xticks(test[0], label, size = 12, fontproperties='Cambria')
     # plt.margins(x=0, y=0)
-    if attribute["xlim"][0] == attribute["xlim"][1]:
-        plt.xlim(time[0], time[-1])
-    else:
+    if attribute["xlim"][0] != attribute["xlim"][1]:
         plt.xlim(attribute["xlim"][0], attribute["xlim"][1])
-    if attribute["ylim"][0] == attribute["ylim"][1]:
-        pass
-    else:
+    if attribute["ylim"][0] != attribute["ylim"][1]:
         plt.ylim(attribute["ylim"][0], attribute["ylim"][1])
     # print(test)
     ax.spines['bottom'].set_linewidth(1)
     ax.spines['left'].set_linewidth(1)
     ax.spines['right'].set_linewidth(1)
     ax.spines['top'].set_linewidth(1)
-    plt.subplots_adjust(left=0.175, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
     plt.xlabel(attribute["xlabel"], fontdict=font)
     plt.savefig(save, transparent=True)
     plt.show()
