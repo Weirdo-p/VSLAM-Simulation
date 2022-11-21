@@ -9,8 +9,8 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [-0.01, 0.01]
-posAttributes["scientific"] = True
+posAttributes["ylim"] = [0.01, 0.01]
+posAttributes["scientific"] = False
 
 posSubAtt = {}
 posSubAtt["xpos"] = 0.1

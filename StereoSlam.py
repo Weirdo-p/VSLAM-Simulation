@@ -87,7 +87,7 @@ class StereoSlam:
         mappoint.m_obs.append(feature)
         return feature
 
-    def runVIO(self, mode = 0, path_to_output = "./", frames_gt=[], maxtime=-1, bNoiseData = False):
+    def runVIO(self, mode = 0, path_to_output = "./", frames_gt=[], maxtime=-1, bNoiseData = False, iteration = 1):
         """Run VIO for an epoch
 
         Args:
@@ -96,11 +96,11 @@ class StereoSlam:
         if mode == 0:
             self.runVIOWithoutError(path_to_output, maxtime)
         elif mode == 1:
-            return self.runVIOWithoutError_CLS(path_to_output, frames_gt, maxtime, bNoiseData)
+            return self.runVIOWithoutError_CLS(path_to_output, frames_gt, maxtime, bNoiseData, iteration)
         elif mode == 2:
-            return self.runVIOWithoutError_FilterAllState(path_to_output, frames_gt, maxtime, bNoiseData)
+            return self.runVIOWithoutError_FilterAllState(path_to_output, frames_gt, maxtime, bNoiseData, iteration)
         elif mode == 3:
-            return self.runVIOWithoutError_CLS_Sequential(path_to_output, frames_gt, maxtime, bNoiseData)
+            return self.runVIOWithoutError_CLS_Sequential(path_to_output, frames_gt, maxtime, bNoiseData, iteration)
         elif mode == 4:
             return self.runVIOWithoutError_FilterAllState_Window(path_to_output, frames_gt, maxtime, bNoiseData)
 
@@ -172,13 +172,13 @@ class StereoSlam:
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
 
 
-    def runVIOWithoutError_CLS(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False):
+    def runVIOWithoutError_CLS(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False, iteration = 1):
         """Run VIO without liearization error and use Common Least Square method
 
         Args:
             path_to_output (str): path to result
         """
-        frames_estimate = self.m_estimator.solveAll(self.m_frames.copy(), self.m_camera, frames_gt, maxtime)
+        frames_estimate = self.m_estimator.solveAll(self.m_frames.copy(), self.m_camera, frames_gt, maxtime, iteration)
 
         LastTime = maxtime
         if maxtime > self.m_frames[len(self.m_frames) - 1].m_time or maxtime == -1:
@@ -239,8 +239,8 @@ class StereoSlam:
                 frame_i += 1
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
 
-    def runVIOWithoutError_FilterAllState(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False):
-        frames_estimate = self.m_filter.filter_AllState(self.m_frames, self.m_camera, frames_gt, maxtime)
+    def runVIOWithoutError_FilterAllState(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False, iteration=1):
+        frames_estimate = self.m_filter.filter_AllState(self.m_frames, self.m_camera, frames_gt, maxtime, iteration)
         LastTime = maxtime
         if maxtime > self.m_frames[len(self.m_frames) - 1].m_time or maxtime == -1:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time
@@ -299,8 +299,8 @@ class StereoSlam:
                 frame_i += 1
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
 
-    def runVIOWithoutError_CLS_Sequential(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False):
-        frames_estimate = self.m_estimator.solveSequential(self.m_frames, self.m_camera, maxtime)
+    def runVIOWithoutError_CLS_Sequential(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False, iteration=1):
+        frames_estimate = self.m_estimator.solveSequential(self.m_frames, self.m_camera, maxtime, iteration)
         LastTime = maxtime
         if maxtime > self.m_frames[len(self.m_frames) - 1].m_time or maxtime == -1:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time

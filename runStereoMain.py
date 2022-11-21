@@ -39,9 +39,9 @@ Slam_gt.readFrameFile(path_to_frame_gt, path_to_feats_gt)
 time, step = -1,  0.2
 while time <= -1:
     Slam = StereoSlam()
-    Slam.m_map.readMapFile(path_to_point_gt)
+    Slam.m_map.readMapFile(path_to_point)
     # print(path_to_feats)
-    Slam.readFrameFile(path_to_frame_gt, path_to_feats_gt)
+    Slam.readFrameFile(path_to_frame, path_to_feats)
 
     # %% try reprojection to validate data and init camera
     fx = 1.9604215879672799e+03
@@ -67,5 +67,5 @@ while time <= -1:
     Slam.m_estimator.m_AttStd = AttStd
     Slam.m_estimator.m_PointStd = PointStd
     Slam.m_camera = cam
-    Slam.runVIO(3, path_to_output, Slam_gt.m_frames,time, False)
+    Slam.runVIO(2, path_to_output, Slam_gt.m_frames,time, False, 5)
     time += step

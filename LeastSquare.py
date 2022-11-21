@@ -15,7 +15,7 @@ class CLS:
         self.m_MapPoints_Point = {}
         self.m_estimateFrame = []
 
-    def solveAll(self, frames, camera, frames_gt, maxtime = -1):
+    def solveAll(self, frames, camera, frames_gt, maxtime = -1, iteration = 1):
         obsnum, statenum = 0, 0
         # count for observations and state
         LastTime = maxtime
@@ -42,7 +42,7 @@ class CLS:
         print(obsnum, statenum)
         
         fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
-        iter, MaxIter = 0, 10
+        iter, MaxIter = 0, iteration
 
         dXLast, P = 0, 0
         P = np.identity(obsnum + statenum)
@@ -144,7 +144,7 @@ class CLS:
             self.m_MapPointPos += 3
     
 
-    def solveSequential(self, frames, camera, maxtime=-1):
+    def solveSequential(self, frames, camera, maxtime=-1, iteration=1):
         LastTime = maxtime
         if maxtime > frames[len(frames) - 1].m_time or maxtime == -1:
             LastTime = frames[len(frames) - 1].m_time
@@ -169,62 +169,66 @@ class CLS:
         pointStateNum = len(self.m_MapPoints) * 3
         StateFrameNum = len(self.m_estimateFrame) * 6
 
-        # init KF matrix
-        self.m_StateCov = np.identity(statenum)
-        PoseCov = np.identity(6)
-        PoseCov[:3, :3] *= (self.m_PosStd ** 2)
-        PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
 
-        i = 0
-        while True:
-            self.m_StateCov[i: i + 6, i: i + 6] = PoseCov
-            i += 6
+        for iter in range(iteration):
+            # init KF matrix
+            self.m_StateCov = np.identity(statenum)
+            PoseCov = np.identity(6)
+            PoseCov[:3, :3] *= (self.m_PosStd ** 2)
+            PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
 
-            if i >= self.m_StateCov.shape[0] - 6:
-                break
-        self.m_StateCov[StateFrameNum:, StateFrameNum:] = np.identity(pointStateNum) * (self.m_PointStd ** 2)
-        self.m_StateCov = np.linalg.inv(self.m_StateCov)
-        
-        N, w = 0, 0
-        state = np.zeros((statenum, 1))
-        for i in range(len(self.m_estimateFrame)):
-            frame = self.m_estimateFrame[i]
-            tec, Rec = frame.m_pos, frame.m_rota
-            features = frame.m_features
-            obsnum = len(features) * 3
-            R = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd
-            J, l = self.setMEQ_AllState(tec, Rec, features, camera, i)
-            W = np.linalg.inv(R)
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/H_FILTER_" + str(i) + ".txt", J)
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_FILTER_" + str(i) + ".txt", l)
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/W_FILTER_" + str(i) + ".txt", W)
-            print("Process " + str(i) + "th frame")
-            N = J.transpose() @ W @ J + self.m_StateCov
-            w = J.transpose() @ W @ l + self.m_StateCov @ state
+            i = 0
+            while True:
+                self.m_StateCov[i: i + 6, i: i + 6] = PoseCov
+                i += 6
 
-            self.m_StateCov = N
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV_CLS.txt", np.linalg.inv(self.m_StateCov))
-            state = np.linalg.inv(N ) @ w
-            # break
-        # update current frame
-        # FramedX = state[i * 6: i * 6 + 6, :]
-        # self.m_estimateFrame[i].m_pos = self.m_estimateFrame[i].m_pos - FramedX[0: 3]
-        # self.m_estimateFrame[i].m_rota = self.m_estimateFrame[i].m_rota @ (np.identity(3) - SkewSymmetricMatrix(FramedX[3: 6]))
+                if i >= self.m_StateCov.shape[0] - 6:
+                    break
+            self.m_StateCov[StateFrameNum:, StateFrameNum:] = np.identity(pointStateNum) * (self.m_PointStd ** 2)
+            self.m_StateCov = np.linalg.inv(self.m_StateCov)
+            # if iter == 1:
+            #     np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/CovCLS.txt", self.m_StateCov)
+            #     exit(-1)
+            N, w = 0, 0
+            state = np.zeros((statenum, 1))
+            for i in range(len(self.m_estimateFrame)):
+                frame = self.m_estimateFrame[i]
+                tec, Rec = frame.m_pos, frame.m_rota
+                features = frame.m_features
+                obsnum = len(features) * 3
+                R = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd
+                J, l = self.setMEQ_AllState(tec, Rec, features, camera, i)
+                W = np.linalg.inv(R)
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/H_FILTER_" + str(i) + ".txt", J)
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_FILTER_" + str(i) + ".txt", l)
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/W_FILTER_" + str(i) + ".txt", W)
+                print("Process " + str(i) + "th frame")
+                N = J.transpose() @ W @ J + self.m_StateCov
+                w = J.transpose() @ W @ l + self.m_StateCov @ state
 
-        # for feat in features:
-        #     MapPointID = feat.m_mappoint.m_id
-        #     MapPointPos = self.m_MapPoints[MapPointID]
-        #     self.m_MapPoints_Point[MapPointID].m_pos = self.m_MapPoints_Point[MapPointID].m_pos - state[StateFrameNum + MapPointPos: StateFrameNum + MapPointPos + 3, :]
+                self.m_StateCov = N
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV_CLS.txt", np.linalg.inv(self.m_StateCov))
+                state = np.linalg.inv(N ) @ w
+                # break
+            # update current frame
+            # FramedX = state[i * 6: i * 6 + 6, :]
+            # self.m_estimateFrame[i].m_pos = self.m_estimateFrame[i].m_pos - FramedX[0: 3]
+            # self.m_estimateFrame[i].m_rota = self.m_estimateFrame[i].m_rota @ (np.identity(3) - SkewSymmetricMatrix(FramedX[3: 6]))
 
-        # update all frames
-        for j in range(len(self.m_estimateFrame)):  
-            self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
-            self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+            # for feat in features:
+            #     MapPointID = feat.m_mappoint.m_id
+            #     MapPointPos = self.m_MapPoints[MapPointID]
+            #     self.m_MapPoints_Point[MapPointID].m_pos = self.m_MapPoints_Point[MapPointID].m_pos - state[StateFrameNum + MapPointPos: StateFrameNum + MapPointPos + 3, :]
 
-        # for id_ in self.m_MapPoints.keys():
+            # update all frames
+            for j in range(len(self.m_estimateFrame)):  
+                self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
+                self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
 
-        #     position = self.m_MapPoints[id_]
-        #     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+            for id_ in self.m_MapPoints.keys():
+
+                position = self.m_MapPoints[id_]
+                self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
         return frames
             
 
