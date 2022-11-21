@@ -12,7 +12,7 @@ import plotmain as main
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-name = "result.txt.-1s.FilterAllState"
+name = "result.txt.-1s.CLS_Seq.Noise"
 path_to_output = prefix + name
 
 
@@ -28,7 +28,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [0.1, 0.1]
+posAttributes["ylim"] = [-0.6, 0.6]
 posAttributes["scientific"] = True
 
 posSubAtt = {}
@@ -37,7 +37,7 @@ posSubAtt["ypos"] = 0.65
 posSubAtt["width"] = 0.4
 posSubAtt["height"] = 0.3
 posSubAtt["range"] = 50, 650
-posSubAtt["ylim"] = [-0.5, 0.5]
+posSubAtt["ylim"] = [-1.5, 1.5]
 posSubAtt["xlim"] = [20, 60]
 posSubAtt["loc"] = [3, 4]
 posAttributes["subplot"] = posSubAtt
@@ -47,7 +47,7 @@ velAttributes["ylabel"] = "Error(m/s)"
 velAttributes["xlabel"] = "Epoch(sec)"
 velAttributes["legend"] = ["R", "F", "U"]
 velAttributes["xlim"] = [0, 70]
-velAttributes["ylim"] = [0.6, 0.6]
+velAttributes["ylim"] = [-1.5, 1.5]
 velAttributes["scientific"] = True
 
 velSubAtt = {}
@@ -68,7 +68,7 @@ attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 70]
-attAttributes["ylim"] = [0.1, 0.1]
+attAttributes["ylim"] = [-0.6, 0.6]
 attAttributes["scientific"] = True
 
 

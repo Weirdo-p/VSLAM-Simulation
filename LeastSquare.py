@@ -169,8 +169,12 @@ class CLS:
         pointStateNum = len(self.m_MapPoints) * 3
         StateFrameNum = len(self.m_estimateFrame) * 6
 
-
-        for iter in range(iteration):
+        MatIteration = iteration
+        if iteration == -1:
+            MatIteration = 10
+        
+        dXLast = 0
+        for iter in range(MatIteration):
             # init KF matrix
             self.m_StateCov = np.identity(statenum)
             PoseCov = np.identity(6)
@@ -229,6 +233,20 @@ class CLS:
 
                 position = self.m_MapPoints[id_]
                 self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+            
+            if iteration != -1:
+                continue
+
+            if iter != 0:
+                print("test", np.linalg.norm(state[:StateFrameNum, :] - dXLast[:StateFrameNum, :], 2))
+                print(np.max(np.abs(state[:StateFrameNum, :] - dXLast[:StateFrameNum, :])))
+
+
+            if iter != 0 and (np.linalg.norm(state[:StateFrameNum] - dXLast[:StateFrameNum], 2) < 1e-2 or np.max(np.abs(state[:StateFrameNum, :] - dXLast[:StateFrameNum, :])) < 1E-2):
+                break
+            
+            dXLast = state.copy()
+            print(iter)
         return frames
             
 

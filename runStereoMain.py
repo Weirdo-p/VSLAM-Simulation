@@ -6,17 +6,17 @@ import numpy as np
 import sys
 #%%  initialization files
 sys.setrecursionlimit(3000)
-path_to_simu = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/data/"
+path_to_simu = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/image/Features/"
 path_to_point = glob.glob(path_to_simu + "*.pc.noise")[0]
 path_to_frame = glob.glob(path_to_simu + "*.fm.noise")[0]
 path_to_feats = glob.glob(path_to_simu + "*.txt")
-path_to_feats = sorted(path_to_feats, key=lambda name: int(name[len(path_to_simu): len(name) - 4]))
+path_to_feats = sorted(path_to_feats, key=lambda name: float(name[len(path_to_simu): len(name) - 4]))
 
 # read ground truth file
 path_to_point_gt = glob.glob(path_to_simu + "*.pc")[0]
 path_to_frame_gt = glob.glob(path_to_simu + "*.fm")[0]
 path_to_feats_gt = glob.glob(path_to_simu + "*.txt")
-path_to_feats_gt = sorted(path_to_feats_gt, key=lambda name: int(name[len(path_to_simu): len(name) - 4]))
+path_to_feats_gt = sorted(path_to_feats_gt, key=lambda name: float(name[len(path_to_simu): len(name) - 4]))
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
@@ -67,5 +67,5 @@ while time <= -1:
     Slam.m_estimator.m_AttStd = AttStd
     Slam.m_estimator.m_PointStd = PointStd
     Slam.m_camera = cam
-    Slam.runVIO(2, path_to_output, Slam_gt.m_frames,time, False, 5)
+    Slam.runVIO(3, path_to_output, Slam_gt.m_frames,time, True, -1)
     time += step

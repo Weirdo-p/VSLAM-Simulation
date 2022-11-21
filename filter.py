@@ -167,8 +167,12 @@ class KalmanFilter:
         statenum = len(self.m_estimateFrame) * 6 + len(self.m_MapPoints) * 3
         pointStateNum = len(self.m_MapPoints) * 3
         StateFrameNum = len(self.m_estimateFrame) * 6
-        
-        for iter in range(iteration):
+
+        MaxIter = iteration
+        if iteration == -1:
+            MaxIter = 1
+
+        for iter in range(MaxIter):
             # init KF matrix
             Phi = np.identity(statenum)     # state transition matrix
             Q = np.zeros((statenum, statenum))       # noise during state transition
@@ -203,7 +207,10 @@ class KalmanFilter:
                 gt = frames_gt[i]
                 frame = self.m_estimateFrame[i]
                 tec, Rec = frame.m_pos, frame.m_rota
+                # if iteration == -1 and i != 0:
+                #     tec, Rec = self.m_estimateFrame[i - 1].m_pos, self.m_estimateFrame[i - 1].m_rota
                 features = frame.m_features
+
                 obsnum = len(features) * 3
                 R = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd
                 J, l = self.setMEQ_AllState(tec, Rec, features, camera, i)
@@ -225,17 +232,22 @@ class KalmanFilter:
                 # tmp = np.linalg.inv(np.linalg.inv(state_cov_pre) + J.transpose() @ W @ J)
                 # CovTmp = tmp
                 self.m_StateCov = CovTmp
-                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV_Filter.txt", self.m_StateCov)
-                # break
-                # update current frame
-                # FramedX = state[i * 6: i * 6 + 6, :]
-                # self.m_estimateFrame[i].m_pos = self.m_estimateFrame[i].m_pos - FramedX[0: 3]
-                # self.m_estimateFrame[i].m_rota = self.m_estimateFrame[i].m_rota @ (np.identity(3) - SkewSymmetricMatrix(FramedX[3: 6]))
 
-                # for feat in features:
-                #     MapPointID = feat.m_mappoint.m_id
-                #     MapPointPos = self.m_MapPoints[MapPointID]
-                #     self.m_MapPoints_Point[MapPointID].m_pos = self.m_MapPoints_Point[MapPointID].m_pos - state[StateFrameNum + MapPointPos: StateFrameNum + MapPointPos + 3, :]
+                if iteration != -1:
+                    continue
+                # update all frames
+                for j in range(len(self.m_estimateFrame)): 
+                    self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
+                    self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                # print(state)
+                for id_ in self.m_MapPoints.keys():
+                    position = self.m_MapPoints[id_]
+                    self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+
+                state = np.zeros((statenum, 1))
+
+            if iteration == -1:
+                continue
 
             # update all frames
             for j in range(len(self.m_estimateFrame)): 

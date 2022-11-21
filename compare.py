@@ -9,8 +9,8 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [0.01, 0.01]
-posAttributes["scientific"] = False
+posAttributes["ylim"] = [-1, 1]
+posAttributes["scientific"] = True
 
 posSubAtt = {}
 posSubAtt["xpos"] = 0.1
@@ -49,7 +49,7 @@ attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 70]
-attAttributes["ylim"] = [-0.01, 0.01]
+attAttributes["ylim"] = [-1, 1]
 attAttributes["scientific"] = True
 
 
@@ -96,8 +96,8 @@ names = [".CLS_Seq", ".CLS"]
 # # print(errors[names[0]].reshape(dim1, dim2))
 # time = errors[names[0]][:, 0]
 
-CLS = np.loadtxt(prefix + "result.txt.-1s.CLS_Seq")
-Filter = np.loadtxt(prefix + "result.txt.-1s.FilterAllState")
+CLS = np.loadtxt(prefix + "result.txt.-1s.CLS_Seq.Noise")
+Filter = np.loadtxt(prefix + "result.txt.-1s.FilterAllState.Noise")
 
 time = CLS[:, 0]
 time -= time[0]
