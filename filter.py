@@ -144,6 +144,7 @@ class KalmanFilter:
         return jaco, l
 
     def filter_AllState(self, frames, camera, frames_gt, maxtime=-1, iteration = 1):
+        np.set_printoptions(threshold=np.inf)
         LastTime = maxtime
         if maxtime > frames[len(frames) - 1].m_time or maxtime == -1:
             LastTime = frames[len(frames) - 1].m_time
@@ -222,7 +223,11 @@ class KalmanFilter:
                 print("Process " + str(i) + "th frame")
                 state_cov_pre = Phi @ self.m_StateCov @ Phi.transpose() + Q
                 K = state_cov_pre @ J.transpose() @ np.linalg.inv(J @ state_cov_pre @ J.transpose() + R)
-                state = state + K @ (l - J @ state)
+                if iteration == -1:
+                    state = K @ l
+                else:
+                    state = state + K @ (l - J @ state)
+                # print(state.transpose())
                 # original covariance matrix
                 tmp = (np.identity(K.shape[0]) - K @ J)
                 CovTmp = tmp @ state_cov_pre
