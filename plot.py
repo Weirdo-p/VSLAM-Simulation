@@ -11,8 +11,8 @@ import plotmain as main
 
 
 #%% init result file
-prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-name = "result.txt.-1s.FilterAllState.Noise"
+prefix = "/home/weirdo/Documents/code/python/VSLAM-Simulation/log/"
+name = "result.txt.-1s.CLS_SW"
 path_to_output = prefix + name
 
 
@@ -28,7 +28,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [0.6, 0.6]
+posAttributes["ylim"] = [-0.6, 0.6]
 posAttributes["scientific"] = True
 
 posSubAtt = {}
