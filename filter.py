@@ -251,6 +251,7 @@ class KalmanFilter:
 
                 state = np.zeros((statenum, 1))
 
+            print(state)
             if iteration == -1:
                 continue
 
@@ -467,13 +468,14 @@ class KalmanFilter:
 
             # prior part
             B_all[: windowsize * 6, :windowsize * 6] = np.identity(windowsize * 6)
-            P_all[: windowsize * 6, :windowsize * 6] = np.linalg.inv(self.m_StateCov)
+            P_all[: windowsize * 6, :windowsize * 6] = self.m_StateCov
             L_all[: windowsize * 6, :] = StateFrame #WARNING: bugs may remain if not rectifying errors
 
             # observation part
             B_all[windowsize * 6:, ] = B
             P_all[windowsize * 6:, windowsize * 6: ] = np.identity(nobs) * self.m_PixelStd * self.m_PixelStd
             L_all[windowsize * 6:, ] = L
+            P_all = np.linalg.inv(P_all)
 
             N = B_all.transpose() @ P_all @ B_all
             b = B_all.transpose() @ P_all @ L_all
@@ -512,7 +514,7 @@ class KalmanFilter:
             Local -= 1
             StateFrame[: tmp, :] = StateFrame[6:, :]
             StateFrame[tmp:, :] = 0
-            print(StateFrame)
+            # print(StateFrame)
         return frames
 
 

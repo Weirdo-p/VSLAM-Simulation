@@ -6,7 +6,7 @@ import numpy as np
 import sys
 #%%  initialization files
 sys.setrecursionlimit(3000)
-path_to_simu = "/home/weirdo/Documents/code/python/VSLAM-Simulation/data/"
+path_to_simu = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/data/"
 path_to_point = glob.glob(path_to_simu + "*.pc.noise")[0]
 path_to_frame = glob.glob(path_to_simu + "*.fm.noise")[0]
 path_to_feats = glob.glob(path_to_simu + "*.txt")
@@ -19,7 +19,7 @@ path_to_feats_gt = glob.glob(path_to_simu + "*.txt")
 path_to_feats_gt = sorted(path_to_feats_gt, key=lambda name: float(name[len(path_to_simu): len(name) - 4]))
 
 #%% init result file
-prefix = "/home/weirdo/Documents/code/python/VSLAM-Simulation/log/"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
 path_to_output = prefix + "result.txt"
 # f = open(path_to_output, "w")
 # f.close()

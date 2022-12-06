@@ -11,8 +11,8 @@ import plotmain as main
 
 
 #%% init result file
-prefix = "/home/weirdo/Documents/code/python/VSLAM-Simulation/log/"
-name = "result.txt.-1s.CLS_SW"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
+name = "result.txt.-1s.Filter_SW"
 path_to_output = prefix + name
 
 
@@ -28,7 +28,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [-2, 2]
+posAttributes["ylim"] = [-6, 6]
 posAttributes["scientific"] = True
 
 posSubAtt = {}
@@ -68,7 +68,7 @@ attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 70]
-attAttributes["ylim"] = [-2, 2]
+attAttributes["ylim"] = [-6, 6]
 attAttributes["scientific"] = True
 
 
@@ -109,5 +109,3 @@ traj_gt[:, 2] = error[:, 12]
 trajs["GroundTruth"] = traj_gt
 trajs["VO"] = traj_vo
 main.plotTraj(time, trajs, prefix + "/" + "traj_" + name + ".svg")
-
-# %%

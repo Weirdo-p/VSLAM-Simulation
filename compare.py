@@ -69,7 +69,7 @@ plotAttributes['vel'] = velAttributes
 plotAttributes['att'] = attAttributes
 
 orders = ["pos", "att"]
-prefix = "/home/weirdo/Documents/code/python/VSLAM-Simulation/log/"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/exp4-SWWithoutError/"
 cmp = "CLS_Filter_SW"
 names = [".CLS_Seq", ".CLS"]
 

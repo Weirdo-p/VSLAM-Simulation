@@ -25,6 +25,7 @@ class CLS:
         for frame in frames:
             if frame.m_time > LastTime:
                 break
+            print("add " + str(frame.m_id) + "th frame")
             features = frame.m_features
             obsnum += len(features) * 3
             self.__addFeatures(features)
@@ -56,7 +57,7 @@ class CLS:
             if row_P >= P.shape[0] - 6:
                 break
         P[posStateNum:posStateNum + pointStateNum, posStateNum:posStateNum + pointStateNum] = np.identity(pointStateNum) * self.m_PointStd * self.m_PointStd
-        P = np.linalg.inv(P)
+        # P = np.linalg.inv(P)
 
         for iter in range(MaxIter):
             # form design matrix and residuals
@@ -102,7 +103,11 @@ class CLS:
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_CLS.txt", L_all)
             # break
             P[statenum:, statenum:] = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd   
+            P = np.linalg.inv(P)
             dx = np.linalg.inv(B_all.transpose() @ P @ B_all) @ B_all.transpose() @ P @ L_all
+            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/B.txt", B_all)
+            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/P.txt", P)
+            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L.txt", L_all)
             print("one loop done")
             # print(dx)
             for i in range(len(self.m_estimateFrame)):
@@ -206,7 +211,7 @@ class CLS:
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/H_FILTER_" + str(i) + ".txt", J)
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_FILTER_" + str(i) + ".txt", l)
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/W_FILTER_" + str(i) + ".txt", W)
-                print("Process " + str(i) + "th frame")
+                print("Process " + str(frame.m_id) + "th frame")
                 N = J.transpose() @ W @ J + self.m_StateCov
                 w = J.transpose() @ W @ l + self.m_StateCov @ state
 
@@ -223,7 +228,7 @@ class CLS:
             #     MapPointID = feat.m_mappoint.m_id
             #     MapPointPos = self.m_MapPoints[MapPointID]
             #     self.m_MapPoints_Point[MapPointID].m_pos = self.m_MapPoints_Point[MapPointID].m_pos - state[StateFrameNum + MapPointPos: StateFrameNum + MapPointPos + 3, :]
-
+            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/dx.txt", state)
             # update all frames
             for j in range(len(self.m_estimateFrame)):  
                 self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -294,7 +299,7 @@ class CLS:
                 continue
             tmp = (windowsize - 1) * 6
             self.m_StateCov[tmp: , tmp:, ] = PoseCov
-
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov_prior.txt", self.m_StateCov)
             # 1. search for observations and landmarks
             self.m_MapPoints = {}
             self.m_MapPoints_Point = {}
@@ -304,8 +309,7 @@ class CLS:
                 nobs += len(frame.m_features) * 3
                 self.__addFeatures(frame.m_features)
             StateLandmark = len(self.m_MapPoints) * 3
-            print("process " + str(i) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
-
+            print("process " + str(frame.m_id) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
             #TODO: 1. solve CLS problem by marginalizing landmark
             AllStateNum = windowsize * 6 + StateLandmark
             TotalObsNum = 0
@@ -324,19 +328,21 @@ class CLS:
 
             # prior part
             B_all[: windowsize * 6, :windowsize * 6] = np.identity(windowsize * 6)
-            P_all[: windowsize * 6, :windowsize * 6] = np.linalg.inv(self.m_StateCov)
-            L_all[: windowsize * 6, :] = StateFrame #WARNING: bugs may remain if not rectifying errors
+            P_all[: windowsize * 6, :windowsize * 6] = self.m_StateCov
+            L_all[: windowsize * 6, :] = StateFrame 
 
             # observation part
             B_all[windowsize * 6:, ] = B
             P_all[windowsize * 6:, windowsize * 6: ] = np.identity(nobs) * self.m_PixelStd * self.m_PixelStd
             L_all[windowsize * 6:, ] = L
+            P_all = np.linalg.inv(P_all)
 
             N = B_all.transpose() @ P_all @ B_all
             b = B_all.transpose() @ P_all @ L_all
             state = np.linalg.inv(N) @ b
             StateFrame = state[: windowsize * 6]
             self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
+            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov.txt", state)
 
 
             # 2. update states. evaluate jacobian at groundtruth, do not update.
