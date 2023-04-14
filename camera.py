@@ -28,10 +28,15 @@ class Camera:
         Args:
             uv (ndarray): point in image plane with shape(3, 1)
         """
+        K = np.array([[self.m_fx, 0, self.m_cx],
+                      [0, self.m_fy, self.m_cy],
+                      [0, 0, 1]])
+        print(np.linalg.inv(K))
+        return np.linalg.inv(K) @ uv
         xyz = np.zeros((3, 1))
         xyz[0, 0] = (uv[0, 0] - self.m_cx) / self.m_fx
         xyz[1, 0] = (uv[1, 0] - self.m_cy) / self.m_fy
-        xyz[2, 0] = self.m_b * self.m_fx / uv[2]
+        # xyz[2, 0] = self.m_b / uv[2]
 
         return xyz
 

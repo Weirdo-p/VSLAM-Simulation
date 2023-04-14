@@ -164,7 +164,7 @@ def ploterror(time, neu, save, attribute, isSubplot):
         # plt.tight_layout()
         # if i != 2:
         #     plt.setp(ax.get_xticklabels(), visible=False)
-        plt.grid(b=False, linestyle='--', color='k', alpha=0.4)
+        plt.grid(linestyle='--', color='k', alpha=0.4)
         direc_ = neu[:, i]
         plt.plot(time, (neu[:, i]) , ls="-", color=color[i], label=direc[i], linewidth=2)#, marker=marker[i], markersize=4)
 
@@ -256,7 +256,7 @@ def plotTraj(time, trajs={ }, save='./'):
     # plt.subplot(gs[:8,:])
     ax = plt.gca()
     ax.set_aspect(1)
-    plt.grid(b=True, linestyle='-', color=grey, alpha=0.5, linewidth=1)
+    plt.grid(linestyle='-', color=grey, alpha=0.5, linewidth=1)
     i = 0
     for key in trajs.keys():
         plt.plot(trajs[key][:, 1], trajs[key][:, 0], label=key, color=color[i])
@@ -609,6 +609,63 @@ def CompareCov(time_data1, time_data2, data1, data2, label1, label2, save):
     plt.xlabel("Epoch (sec)", fontdict=font)
     plt.savefig(save, transparent=True)
     plt.show()
+
+def plotPointsWithTraj(trajs=[], points=[], save="./"):
+
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    ax = plt.figure(figsize=(6, 6)).add_subplot(projection='3d')
+    # direc = ["Y", "P", "R"]
+    marker=["o", "^", "D"]
+    # print(save)
+
+    # ax = plt.subplot(3, 1, i + 1)
+    # plt.tight_layout()
+    # if i != 2:
+    #     plt.setp(ax.get_xticklabels(), visible=False)
+    # plt.grid(b=False, linestyle='--', color='k', alpha=0.5)
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color[3], s=30)
+    ax.plot(trajs[:, 0], trajs[:, 1], trajs[:, 2], linewidth=4, c=color[2])
+    # ax.grid(False)
+    ax.ticklabel_format(style='sci', axis='x')
+    ax.ticklabel_format(style='sci', axis='y')
+    ax.ticklabel_format(style='sci', axis='z')
+
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0))
+    ax.set_zlim(-50, 50)
+    ax.set_xticks([-50, -30, -10, 10, 30, 50])
+    ax.set_yticks([-50, -30, -10, 10, 30, 50])
+    ax.set_zticks([-50, -30, -10, 10, 30, 50])
+    ax.set_xlabel("x (m)", fontdict=font)
+    ax.set_ylabel("y (m)", fontdict=font)
+    ax.set_zlabel("z (m)", fontdict=font)
+
+    ax = plt.gca()
+    # ax.set_aspect(1)
+
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+
+    # ax.spines['right'].set_visible(False)
+    # ax.spines['top'].set_visible(False)
+    # ax.spines['left'].set_visible(False)
+    # ax.spines['bottom'].set_visible(False)
+    # plt.yticks([])
+    # plt.xticks([])
+    plt.ylim(-50, 50)
+    plt.xlim(-50, 50)
+
+
+
+    # plt.subplots_adjust(left=0.14, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    # plt.xlabel("Epoch (sec)", fontdict=font)
+    plt.savefig(save, transparent=True)
+    plt.show()
+
 
 # # residual = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-03-08.txt"
 # calResPath_vio = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\20220308_no_loop.tum"

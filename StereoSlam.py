@@ -8,6 +8,7 @@ from camera import Camera
 from vcommon import *
 from filter import *
 from coors import *
+import plotmain
 
 from scipy.spatial.transform import Rotation as R
 
@@ -40,6 +41,47 @@ class StereoSlam:
                     i_frame += 1
                 else:
                     break
+    
+    def plot(self):
+        path, points = [], []
+
+        Rec0, tec0 = self.m_frames[0].m_rota, self.m_frames[0].m_pos 
+        for i in range(len(self.m_frames)):
+            if i == 0:
+                continue
+            Rec, tec = self.m_frames[i].m_rota, self.m_frames[i].m_pos
+
+            pos = Rec0 @ (tec - tec0)
+            tec.reshape(3, -1)
+            path.append(tec - tec0)
+            print(tec)
+        
+        for id, point in self.m_map.m_points.items():
+            pos = point.m_pos - tec0
+            # pos = (Rec0 @ (pos - tec0))
+            pos.reshape(3, -1)
+
+            if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
+                continue
+            points.append(pos)
+
+        
+        
+        path = np.array(path)
+        points = np.array(points)
+
+        # y = path[:, 1]
+        # path[:, 1] = path[:, 2]
+        # path[:, 2] = y
+
+        # y = points[:, 1]
+        # points[:, 1] = points[:, 2]
+        # points[:, 2] = y
+        plotmain.plotPointsWithTraj(path, points, "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/data/traj.svg")
+
+        
+            
+
     
     def __parseFrameLine(self, line = str()):
         items = line.split()
