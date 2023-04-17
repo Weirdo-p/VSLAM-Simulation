@@ -12,7 +12,7 @@ import plotmain as main
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-name = "result.txt.-1s.CLS_SW"
+name = "result.txt.-1s.CLS_SW_Marg"
 path_to_output = prefix + name
 
 
