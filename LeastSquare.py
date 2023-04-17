@@ -14,7 +14,6 @@ class CLS:
         self.m_MapPointPos = 0      # [cameraPos CameraRotation point1 ... pointN]
         self.m_MapPoints_Point = {}
         self.m_estimateFrame = []
-        self.m_bMarginalization = False
         self.m_Nmarg = 0
         self.m_bmarg = 0
         self.m_LandmarkLocal = {}
@@ -389,18 +388,10 @@ class CLS:
         
         # initialize sliding window
         LocalFrames, LocalFrames_gt = {}, {}
-        self.m_StateCov = np.zeros((StateFrameSize, StateFrameSize))
         PoseCov = np.identity(6)
         PoseCov[:3, :3] *= (self.m_PosStd ** 2)
         PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
 
-        i = 0
-        while True:
-            self.m_StateCov[i: i + 6, i: i + 6] = PoseCov
-            i += 6
-
-            if i >= self.m_StateCov.shape[0]:
-                break
 
         Local = 0
         StateFrame = np.zeros((windowsize * 6, 1))
@@ -413,8 +404,6 @@ class CLS:
             Local += 1
             if Local < windowsize:
                 continue
-            tmp = (windowsize - 1) * 6
-            self.m_StateCov[tmp: , tmp:, ] = PoseCov
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov_prior.txt", self.m_StateCov)
             # 1. search for observations and landmarks
             self.m_MapPoints = {}
@@ -425,6 +414,19 @@ class CLS:
                 nobs += len(frame.m_features) * 3
                 self.__addFeatures(frame.m_features)
             StateLandmark = len(self.m_MapPoints) * 3
+
+            self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
+            i = 0
+            while True:
+                self.m_StateCov[i: i + 6, i: i + 6] = PoseCov
+                i += 6
+
+                if i >= StateFrameSize:
+                    break
+            self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+            tmp = (windowsize - 1) * 6
+            self.m_StateCov[tmp: StateFrameSize, tmp:StateFrameSize] = PoseCov
+            
             print("process " + str(frame.m_id) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
             #TODO: 1. solve CLS problem by marginalizing landmark
             AllStateNum = windowsize * 6 + StateLandmark
@@ -449,7 +451,7 @@ class CLS:
 
             # observation part
             B_obs = B
-            P_obs = np.identity(nobs) * self.m_PixelStd * self.m_PixelStd
+            P_obs = np.identity(nobs) * (1.0 / self.m_PixelStd * self.m_PixelStd)
             L_obs = L
 
             N = B_obs.transpose() @ P_obs @ B_obs + NPrior
@@ -482,7 +484,6 @@ class CLS:
             StateFrame[: tmp, :] = StateFrame[6:, :]
             StateFrame[tmp:, :] = 0
             self.marginalization(N, b, windowsize)
-            print("test")
         return frames
     
     def marginalization(self, N, b, WindowSize):
@@ -552,10 +553,10 @@ class CLS:
 
         NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
         if len(self.m_LandmarkLocal) == 0:
-            B, L = np.zeros((windowsize * 6, StateNum)), np.zeros((windowsize * 6, 1))
-            P = np.zeros((windowsize * 6, windowsize * 6))
-            B[: windowsize * 6, :windowsize * 6] = np.identity(windowsize * 6)
-            P[: windowsize * 6, :windowsize * 6] = self.m_StateCov
+            B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            P = np.zeros((StateNum, StateNum))
+            B = np.identity(StateNum)
+            P = np.linalg.inv(self.m_StateCov)
             L[: windowsize * 6, :] = StateFrame 
 
             NPrior = B.transpose() @ P @ B
