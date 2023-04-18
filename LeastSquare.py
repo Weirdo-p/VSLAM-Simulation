@@ -457,6 +457,7 @@ class CLS:
             N = B_obs.transpose() @ P_obs @ B_obs + NPrior
             b = B_obs.transpose() @ P_obs @ L_obs + bPrior
             state = np.linalg.inv(N) @ b
+            # state[: windowsize * 6, :] += StateFrame
             StateFrame = state[: windowsize * 6]
             self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov.txt", state)
