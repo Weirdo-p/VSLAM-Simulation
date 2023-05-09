@@ -32,8 +32,10 @@ class KalmanFilter:
 
         self.m_MapPoints = {}       # position of mappoint in state vector
         self.m_MapPointPos = 6      # [cameraPos CameraRotation point1 ... pointN]
+        self.m_MapPoints_Prev = {}  # previous window position
 
         self.m_MapPoints_Point = {}
+        self.m_MapPoints_Point_linear = {}       # position of mappoint in state vector
         self.m_estimateFrame = []
         self.m_Nmarg = np.zeros((0, 0))
         self.m_bmarg = np.zeros((0, 0))
@@ -147,7 +149,7 @@ class KalmanFilter:
 
         return jaco, l
 
-    def filter_AllState(self, frames, camera, frames_gt, maxtime=-1, iteration = 1):
+    def filter_AllState(self, frames, camera, frames_gt,frames_linear, maxtime=-1, iteration = 1):
         np.set_printoptions(threshold=np.inf)
         LastTime = maxtime
         if maxtime > frames[len(frames) - 1].m_time or maxtime == -1:
@@ -269,7 +271,150 @@ class KalmanFilter:
                 self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
 
         return frames
+
+
+    def filter_AllState_PPT(self, frames, camera, frames_gt, frames_linear, maxtime=-1, iteration = 1):
+        np.set_printoptions(threshold=np.inf)
+        LastTime = maxtime
+        if maxtime > frames[len(frames) - 1].m_time or maxtime == -1:
+            LastTime = frames[len(frames) - 1].m_time
+        self.m_MapPointPos = 0
+        self.m_MapPoints = {}       # position of mappoint in state vector
+
+        self.m_MapPoints_Point = {}
+        self.m_MapPoints_Point_linear = {}
+        self.m_estimateFrame = []
+        self.m_estimateFrame_linear = []
+        # determine matrix size
+        obsnum, statenum = 0, 0
+        # count for observations and state
+        count = 0
+        for i in range(len(frames)):
+            frame = frames[i]
+            frame_linear = frames_linear[i]
+            if frame.m_time > LastTime:
+                break
+            features = frame.m_features
+            features_linear = frame_linear.m_features
+            obsnum += len(features) * 3
+            self.__addFeatures_PPT(features, features_linear)
+            self.m_estimateFrame.append(frame)
+            self.m_estimateFrame_linear.append(frame_linear)
+
+        statenum = len(self.m_estimateFrame) * 6 + len(self.m_MapPoints) * 3
+        pointStateNum = len(self.m_MapPoints) * 3
+        StateFrameNum = len(self.m_estimateFrame) * 6
+
+        MaxIter = iteration
+        if iteration == -1:
+            MaxIter = 1
+
+        for iter in range(MaxIter):
+            # init KF matrix
+            Phi = np.identity(statenum)     # state transition matrix
+            Q = np.zeros((statenum, statenum))       # noise during state transition
+            # Q[:StateFrameNum, : StateFrameNum] = self.m_QPose
+            j = 0
+            while True:
+                Q[j : j + 6, j : j + 6] = self.m_QPose
+                j += 6
+                if j >= statenum - 6:
+                    break
+
+            Q[StateFrameNum:, StateFrameNum:] = np.identity(pointStateNum) * self.m_QPoint
+            print(self.m_AttStd)
+            self.m_StateCov = np.identity(statenum)
+            PoseCov = np.identity(6)
+            PoseCov[:3, :3] *= (self.m_PosStd ** 2)
+            PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
+
+            j = 0
+            while True:
+                self.m_StateCov[j: j + 6, j: j + 6] = PoseCov
+                j += 6
+
+                if j >= self.m_StateCov.shape[0] - 6:
+                    break
+            self.m_StateCov[StateFrameNum:, StateFrameNum:] = np.identity(pointStateNum) * (self.m_PointStd ** 2)
+            # if iter == 1:
+            #     np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/CovFilter.txt", self.m_StateCov)
+            #     exit(-1)
+            state = np.zeros((statenum, 1))
+            for i in range(len(self.m_estimateFrame)):
+                gt = frames_gt[i]
+                frame = self.m_estimateFrame_linear[i]
+                tec, Rec = frame.m_pos, frame.m_rota
+                # if iteration == -1 and i != 0:
+                #     tec, Rec = self.m_estimateFrame[i - 1].m_pos, self.m_estimateFrame[i - 1].m_rota
+                features = frame.m_features
+
+                obsnum = len(features) * 3
+                R = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd
+                J, l = self.setMEQ_AllState(tec, Rec, features, camera, i)
+                # l_all = l_all + l
+                W = np.linalg.inv(R)
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/H_FILTER_" + str(i) + ".txt", J)
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_FILTER_" + str(i) + ".txt", l)
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/W_FILTER_" + str(i) + ".txt", W)
+                print("Process " + str(i) + "th frame")
+                state_cov_pre = Phi @ self.m_StateCov @ Phi.transpose() + Q
+                K = state_cov_pre @ J.transpose() @ np.linalg.inv(J @ state_cov_pre @ J.transpose() + R)
+                if iteration == -1:
+                    state = K @ l
+                else:
+                    state = K @ l # state + K @ (l - J @ state)
+                # print(state.transpose())
+                # original covariance matrix
+                tmp = (np.identity(K.shape[0]) - K @ J)
+                CovTmp = tmp @ state_cov_pre
+
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV.txt")
+                # test covariance matrix
+                # tmp = np.linalg.inv(np.linalg.inv(state_cov_pre) + J.transpose() @ W @ J)
+                # CovTmp = tmp
+                self.m_StateCov = CovTmp
+
+                # if iteration != -1:
+                #     continue
+                # update all frames
+                for j in range(len(self.m_estimateFrame)): 
+                    self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
+                    self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                # print(state)
+                for id_ in self.m_MapPoints.keys():
+                    position = self.m_MapPoints[id_]
+                    self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+
+                state = np.zeros((statenum, 1))
+
+            # print(state)
+            if iteration == -1:
+                continue
             
+            for i in range(len(self.m_estimateFrame)):
+                frame = self.m_estimateFrame[i]
+                frame_linear = self.m_estimateFrame_linear[i]
+
+                frame_linear.m_pos = frame.m_pos.copy()
+                frame_linear.m_rota = frame.m_rota.copy()
+
+            for id in self.m_MapPoints_Point.keys():
+                point = self.m_MapPoints_Point[id]
+                point_linear = self.m_MapPoints_Point_linear[id]
+
+                point_linear.m_pos = point.m_pos.copy()
+            # # update all frames
+            # for j in range(len(self.m_estimateFrame)): 
+            #     self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
+            #     self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+            # # print(state)
+            # for id_ in self.m_MapPoints.keys():
+            #     position = self.m_MapPoints[id_]
+            #     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+
+        return frames
+
+
     def filter_AllState_Window(self, frames, camera, frames_gt, maxtime=-1):
         LastTime = maxtime
         if maxtime > frames[len(frames) - 1].m_time or maxtime == -1:
@@ -593,7 +738,7 @@ class KalmanFilter:
                 L[TotalObsNum : TotalObsNum + obsnum, :] = l
                 TotalObsNum += obsnum
 
-            NPrior, bPrior, NPrior_inv, XPrior = self.premarginalization(windowsize, AllStateNum, StateFrame)
+            NPrior, bPrior, NPrior_inv, XPrior, dX = self.premarginalization(windowsize, AllStateNum, StateFrame)
             # np.linalg.cholesky(NPrior)
 
             B_obs, L_obs = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
@@ -625,7 +770,7 @@ class KalmanFilter:
             R = np.identity(TotalObsNum) * (self.m_PixelStd * self.m_PixelStd)
             K = NPrior_inv @ B_obs.transpose() @ np.linalg.inv(B_obs @ NPrior_inv @ B_obs.transpose() + R)
             state = XPrior + K @ (L_obs - B_obs @ XPrior)
-            StateFrame = state[: windowsize * 6, :]
+            StateFrame = state
 
             # 2. update states. evaluate jacobian at groundtruth, do not update.
             for j in range(Local):  
@@ -645,8 +790,9 @@ class KalmanFilter:
             self.m_StateCov[tmp:, :] = 0
             self.m_StateCov[:, tmp: ] = 0
             Local -= 1
-            StateFrame[: tmp, :] = StateFrame[6:, :]
-            StateFrame[tmp:, :] = 0
+            StateFrame[: tmp, :] = StateFrame[6: StateFrameSize, :]
+            StateFrame[tmp: StateFrameSize, :] = 0
+            self.m_MapPoints_Prev = self.m_MapPoints
             self.marginalization(N, b, windowsize)
         return frames
 
@@ -768,10 +914,25 @@ class KalmanFilter:
 
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/NPrior.txt", NPrior)
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/X_return.txt", X_return)
-            return NPrior, bPrior, NPrior_inv, X_return
+            # return NPrior, bPrior, NPrior_inv, X_return
         else:
-            return NPrior, bPrior, NPrior_inv, np.zeros((StateNum, 1))
+            X_return = np.zeros((StateNum, 1))
 
+
+        FrameStateNum = windowsize * 6
+        dX = np.zeros((StateNum, 1))
+        if StateFrame.shape[0] != windowsize * 6:
+            dX[:FrameStateNum, :] = StateFrame[:FrameStateNum, :]
+            mapping = {}
+            for mappointID, LocalPos in self.m_MapPoints_Prev.items():
+                if mappointID in self.m_MapPoints.keys():
+                    GlobalPos = self.m_MapPoints[mappointID] + FrameStateNum
+                    mapping[GlobalPos] = LocalPos + FrameStateNum
+
+            for gpos, lpos in mapping.items():
+                dX[gpos: gpos + 3, :] = StateFrame[lpos: lpos + 3, :]
+
+        return NPrior, bPrior, NPrior_inv, X_return, dX
         
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/J_return.txt", J_return)
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/J.txt", J)
@@ -779,13 +940,34 @@ class KalmanFilter:
 
 
     def __addFeatures(self, features):
-        for feat in features:
+        for i in range(len(features)):
+            feat = features[i]
+
             mappoint = feat.m_mappoint
             mappointID = mappoint.m_id
+
             if mappointID in self.m_MapPoints.keys():
                 continue
             self.m_MapPoints[mappointID] = self.m_MapPointPos
             self.m_MapPoints_Point[mappointID] = mappoint
+            self.m_MapPointPos += 3
+
+
+    def __addFeatures_PPT(self, features, features_linear):
+        for i in range(len(features)):
+            feat = features[i]
+            feat_linear = features_linear[i]
+            mappoint = feat.m_mappoint
+            mappointID = mappoint.m_id
+
+            mappoint_linear = feat_linear.m_mappoint
+            mappointID_linear = mappoint_linear.m_id
+
+            if mappointID in self.m_MapPoints.keys():
+                continue
+            self.m_MapPoints[mappointID] = self.m_MapPointPos
+            self.m_MapPoints_Point[mappointID] = mappoint
+            self.m_MapPoints_Point_linear[mappointID_linear] = mappoint_linear
             self.m_MapPointPos += 3
 
     def setMEQ_SW(self, tec, Rec, features, camera, windowsize, LocalID):

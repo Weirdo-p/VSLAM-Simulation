@@ -108,9 +108,9 @@ class CLS:
             P[statenum:, statenum:] = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd   
             P = np.linalg.inv(P)
             dx = np.linalg.inv(B_all.transpose() @ P @ B_all) @ B_all.transpose() @ P @ L_all
-            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/B.txt", B_all)
-            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/P.txt", P)
-            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L.txt", L_all)
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/B.txt", B_all)
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/P.txt", P)
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L.txt", L_all)
             print("one loop done")
             # print(dx)
             for i in range(len(self.m_estimateFrame)):
@@ -214,7 +214,7 @@ class CLS:
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/H_FILTER_" + str(i) + ".txt", J)
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_FILTER_" + str(i) + ".txt", l)
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/W_FILTER_" + str(i) + ".txt", W)
-                print("Process " + str(frame.m_id) + "th frame")
+                print("Process " + str(i) + "th frame")
                 N = J.transpose() @ W @ J + self.m_StateCov
                 w = J.transpose() @ W @ l + self.m_StateCov @ state
 
@@ -231,7 +231,7 @@ class CLS:
             #     MapPointID = feat.m_mappoint.m_id
             #     MapPointPos = self.m_MapPoints[MapPointID]
             #     self.m_MapPoints_Point[MapPointID].m_pos = self.m_MapPoints_Point[MapPointID].m_pos - state[StateFrameNum + MapPointPos: StateFrameNum + MapPointPos + 3, :]
-            np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/dx.txt", state)
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/dx.txt", state)
             # update all frames
             for j in range(len(self.m_estimateFrame)):  
                 self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]

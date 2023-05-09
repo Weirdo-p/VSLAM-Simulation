@@ -52,17 +52,23 @@ class StereoSlam:
             Rec, tec = self.m_frames[i].m_rota, self.m_frames[i].m_pos
 
             pos = Rec0 @ (tec - tec0)
-            tec.reshape(3, -1)
-            path.append(tec - tec0)
-            print(tec)
+            a = pos[1, 0]
+            pos[1, 0] = pos[2, 0]
+            pos[2, 0] = a            # tec.reshape(3, -1)
+            path.append(pos)
+            # print(tec)
         
         for id, point in self.m_map.m_points.items():
             pos = point.m_pos - tec0
-            # pos = (Rec0 @ (pos - tec0))
-            pos.reshape(3, -1)
+            pos = (Rec0 @ (pos))
+            # print(pos)
+            a = pos[1, 0]
+            pos[1, 0] = pos[2, 0]
+            pos[2, 0] = a            # tec.reshape(3, -1)
+            # pos.reshape(3, -1)
 
-            if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
-                continue
+            # if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
+            #     continue
             points.append(pos)
 
         
@@ -129,7 +135,7 @@ class StereoSlam:
         mappoint.m_obs.append(feature)
         return feature
 
-    def runVIO(self, mode = 0, path_to_output = "./", frames_gt=[], maxtime=-1, bNoiseData = False, iteration = 1, windowsize=20):
+    def runVIO(self, mode = 0, path_to_output = "./", frames_gt=[], frames_linear=[], maxtime=-1, bNoiseData = False, iteration = 1, windowsize=20):
         """Run VIO for an epoch
 
         Args:
@@ -140,7 +146,7 @@ class StereoSlam:
         elif mode == 1:
             return self.runVIOWithoutError_CLS(path_to_output, frames_gt, maxtime, bNoiseData, iteration)
         elif mode == 2:
-            return self.runVIOWithoutError_FilterAllState(path_to_output, frames_gt, maxtime, bNoiseData, iteration)
+            return self.runVIOWithoutError_FilterAllState(path_to_output, frames_gt, frames_linear, maxtime, bNoiseData, iteration)
         elif mode == 3:
             return self.runVIOWithoutError_CLS_Sequential(path_to_output, frames_gt, maxtime, bNoiseData, iteration)
         elif mode == 4:
@@ -288,8 +294,8 @@ class StereoSlam:
                 frame_i += 1
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
 
-    def runVIOWithoutError_FilterAllState(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False, iteration=1):
-        frames_estimate = self.m_filter.filter_AllState(self.m_frames, self.m_camera, frames_gt, maxtime, iteration)
+    def runVIOWithoutError_FilterAllState(self, path_to_output, frames_gt, frames_linear, maxtime=-1, bNoiseData = False, iteration=1):
+        frames_estimate = self.m_filter.filter_AllState(self.m_frames, self.m_camera, frames_gt, frames_linear, maxtime, iteration)
         LastTime = maxtime
         if maxtime > self.m_frames[len(self.m_frames) - 1].m_time or maxtime == -1:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time

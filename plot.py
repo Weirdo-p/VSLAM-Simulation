@@ -12,7 +12,7 @@ import plotmain as main
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-name = "result.txt.-1s.Filter_SW_Marg"
+name = "result.txt.-1s.FilterAllState.Noise"
 path_to_output = prefix + name
 
 
@@ -28,7 +28,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [-6, 6]
+posAttributes["ylim"] = [0.5, 0.5]
 posAttributes["scientific"] = True
 
 posSubAtt = {}
