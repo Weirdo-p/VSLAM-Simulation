@@ -6,7 +6,7 @@ import numpy as np
 import sys
 #%%  initialization files
 sys.setrecursionlimit(3000)
-path_to_simu = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/image/Features/"
+path_to_simu = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/data/"
 path_to_point = glob.glob(path_to_simu + "*.pc.noise")[0]
 path_to_frame = glob.glob(path_to_simu + "*.fm.noise")[0]
 path_to_feats = glob.glob(path_to_simu + "*.txt")
@@ -38,17 +38,17 @@ Slam_gt.readFrameFile(path_to_frame_gt, path_to_feats_gt)
 # Slam_gt.plot()
 
 Slam_linear = StereoSlam()
-Slam_linear.m_map.readMapFile(path_to_point)
+Slam_linear.m_map.readMapFile(path_to_point_gt)
 # print(path_to_feats)
-Slam_linear.readFrameFile(path_to_frame, path_to_feats)
+Slam_linear.readFrameFile(path_to_frame_gt, path_to_feats_gt)
 
 # %%
 time, step = -1,  0.2
 while time <= -1:
     Slam = StereoSlam()
-    Slam.m_map.readMapFile(path_to_point)
+    Slam.m_map.readMapFile(path_to_point_gt)
     # print(path_to_feats)
-    Slam.readFrameFile(path_to_frame, path_to_feats)
+    Slam.readFrameFile(path_to_frame_gt, path_to_feats_gt)
 
     # %% try reprojection to validate data and init camera
     fx = 1.9604215879672799e+03
@@ -74,5 +74,5 @@ while time <= -1:
     Slam.m_estimator.m_AttStd = AttStd
     Slam.m_estimator.m_PointStd = PointStd
     Slam.m_camera = cam
-    Slam.runVIO(2, path_to_output, Slam_gt.m_frames, Slam_linear.m_frames, time, True, 2, 20)
+    Slam.runVIO(7, path_to_output, Slam_gt.m_frames, Slam_linear.m_frames, time, False, 1, 20)
     time += step

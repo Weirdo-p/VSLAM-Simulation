@@ -10,7 +10,7 @@ posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
 posAttributes["ylim"] = [-1, 1]
-posAttributes["scientific"] = True
+posAttributes["scientific"] = False
 
 posSubAtt = {}
 posSubAtt["xpos"] = 0.1
@@ -69,8 +69,8 @@ plotAttributes['vel'] = velAttributes
 plotAttributes['att'] = attAttributes
 
 orders = ["pos", "att"]
-prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-cmp = "CLS_Filter_SW"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/exp3-NormalCLSandFilter/"
+cmp = "CLS_FilterAll"
 names = [".CLS_Seq", ".CLS"]
 
 # errors = {}

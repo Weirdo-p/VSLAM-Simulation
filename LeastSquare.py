@@ -416,12 +416,12 @@ class CLS:
             StateLandmark = len(self.m_MapPoints) * 3
 
             self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
-            i = 0
+            j = 0
             while True:
-                self.m_StateCov[i: i + 6, i: i + 6] = PoseCov
-                i += 6
+                self.m_StateCov[j: j + 6, j: j + 6] = PoseCov
+                j += 6
 
-                if i >= StateFrameSize:
+                if j >= StateFrameSize:
                     break
             self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
             tmp = (windowsize - 1) * 6
@@ -446,31 +446,29 @@ class CLS:
 
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/NPrior.txt", NPrior)
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/bPrior.txt", bPrior)
-            B_obs, L_obs = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            P_obs = np.zeros((nobs, nobs))
+            P_obs = np.identity(nobs) * (1.0 / (self.m_PixelStd * self.m_PixelStd))
 
-            # observation part
-            B_obs = B
-            P_obs = np.identity(nobs) * (1.0 / self.m_PixelStd * self.m_PixelStd)
-            L_obs = L
-
-            N = B_obs.transpose() @ P_obs @ B_obs + NPrior
-            b = B_obs.transpose() @ P_obs @ L_obs + bPrior
+            N = B.transpose() @ P_obs @ B + NPrior
+            b = B.transpose() @ P_obs @ L + bPrior
             state = np.linalg.inv(N) @ b
             # state[: windowsize * 6, :] += StateFrame
             StateFrame = state[: windowsize * 6]
             self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov.txt", state)
-
+            # print(NPrior)
+            # print(bPrior)
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/cls_sw_stateX.txt", state)
+            # break
 
             # 2. update states. evaluate jacobian at groundtruth, do not update.
             for j in range(Local):  
                 LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
                 LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+            StateFrameNum = windowsize * 6
 
             # for id_ in self.m_MapPoints.keys():
             #     position = self.m_MapPoints[id_]
-            #     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+            #     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
 
             # 3. remove old frame and its covariance
             # TODO: marginalization should be applied
@@ -559,6 +557,8 @@ class CLS:
             B = np.identity(StateNum)
             P = np.linalg.inv(self.m_StateCov)
             L[: windowsize * 6, :] = StateFrame 
+
+            # print(L)
 
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L

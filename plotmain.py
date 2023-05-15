@@ -615,6 +615,7 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.direction'] = 'in'
     ax = plt.figure(figsize=(6, 6)).add_subplot(projection='3d')
+    ax.view_init(elev=35, azim=45, roll=0)
     # direc = ["Y", "P", "R"]
     marker=["o", "^", "D"]
     # print(save)
@@ -624,7 +625,7 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     # if i != 2:
     #     plt.setp(ax.get_xticklabels(), visible=False)
     # plt.grid(b=False, linestyle='--', color='k', alpha=0.5)
-    ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color[3], s=30)
+    # ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color[3], s=30)
     ax.plot(trajs[:, 0], trajs[:, 1], trajs[:, 2], linewidth=4, c=color[2])
     # ax.grid(False)
     ax.ticklabel_format(style='sci', axis='x')

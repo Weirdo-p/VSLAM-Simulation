@@ -11,7 +11,7 @@ import plotmain as main
 
 
 #%% init result file
-prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/exp3-NormalCLSandFilter/"
 name = "result.txt.-1s.FilterAllState.Noise"
 path_to_output = prefix + name
 
@@ -28,7 +28,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [0.5, 0.5]
+posAttributes["ylim"] = [-2, 2]
 posAttributes["scientific"] = True
 
 posSubAtt = {}
@@ -68,7 +68,7 @@ attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 70]
-attAttributes["ylim"] = [-6, 6]
+attAttributes["ylim"] = [-3, 3]
 attAttributes["scientific"] = True
 
 

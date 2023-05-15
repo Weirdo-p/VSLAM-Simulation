@@ -715,12 +715,12 @@ class KalmanFilter:
             AllStateNum = windowsize * 6 + StateLandmark
             TotalObsNum = 0
             self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
-            i = 0
+            j = 0
             while True:
-                self.m_StateCov[i: i + 6, i: i + 6] = PoseCov
-                i += 6
+                self.m_StateCov[j: j + 6, j: j + 6] = PoseCov
+                j += 6
 
-                if i >= StateFrameSize:
+                if j >= StateFrameSize:
                     break
             self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
             tmp = (windowsize - 1) * 6
@@ -739,37 +739,13 @@ class KalmanFilter:
                 TotalObsNum += obsnum
 
             NPrior, bPrior, NPrior_inv, XPrior, dX = self.premarginalization(windowsize, AllStateNum, StateFrame)
-            # np.linalg.cholesky(NPrior)
+            P_obs = np.identity(nobs) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
+            N = B.transpose() @ P_obs @ B + NPrior
+            b = B.transpose() @ P_obs @ L + bPrior
 
-            B_obs, L_obs = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            P_obs = np.zeros((nobs, nobs))
-            # TODO: need to complete test of margi
-            # B_all, L_all = np.zeros((nobs + JPrior.shape[0], AllStateNum)), np.zeros((nobs + LPrior.shape[0], 1))
-            # P_all = np.identity(B_all.shape[0])
-
-            # observation part
-            B_obs = B
-            P_obs = np.identity(nobs) * (1.0 / self.m_PixelStd * self.m_PixelStd)
-            L_obs = L
-
-            # B_all[: JPrior.shape[0], :] = JPrior
-            # L_all[: LPrior.shape[0], :] = LPrior
-
-            # B_all[JPrior.shape[0]:, :] = B_obs
-            # L_all[JPrior.shape[0]:, :] = L_obs
-
-            # NPrior = JPrior.transpose() @ JPrior
-            # bPrior = JPrior.transpose() @ LPrior
-
-            N = B_obs.transpose() @ P_obs @ B_obs + NPrior
-            b = B_obs.transpose() @ P_obs @ L_obs + bPrior
-            # P_all = np.linalg.inv(P_all)
-
-            # NPrior = np.linalg.inv(NPrior)
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/NPrior.txt", NPrior)
-            R = np.identity(TotalObsNum) * (self.m_PixelStd * self.m_PixelStd)
-            K = NPrior_inv @ B_obs.transpose() @ np.linalg.inv(B_obs @ NPrior_inv @ B_obs.transpose() + R)
-            state = XPrior + K @ (L_obs - B_obs @ XPrior)
+            R = np.identity(nobs) * (self.m_PixelStd * self.m_PixelStd)
+            K = NPrior_inv @ B.transpose() @ np.linalg.inv(B @ NPrior_inv @ B.transpose() + R)
+            state = XPrior + K @ (L - B @ XPrior)
             StateFrame = state
 
             # 2. update states. evaluate jacobian at groundtruth, do not update.
@@ -870,10 +846,12 @@ class KalmanFilter:
             P = np.zeros((StateNum, StateNum))
             B = np.identity(StateNum)
             P = np.linalg.inv(self.m_StateCov)
-            L[: windowsize * 6, :] = StateFrame 
 
+            L[: windowsize * 6, :] = StateFrame 
+            # print(L)
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L
+            NPrior_inv = self.m_StateCov
         else:
             FrameStateNum = windowsize * 6
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
@@ -900,7 +878,8 @@ class KalmanFilter:
             J = np.linalg.cholesky(self.m_Nmarg).transpose()
             L = np.linalg.pinv(J.transpose()) @ self.m_bmarg
             # print(self.m_Nmarg - J.transpose() @ J)
-            X = np.linalg.pinv(J) @ L
+            # X = np.linalg.pinv(J) @ L
+            X = np.linalg.inv(self.m_Nmarg) @ self.m_bmarg
             X_return = np.zeros((StateNum, 1))
             FrameStateNum = windowsize * 6
             mapping = {}
