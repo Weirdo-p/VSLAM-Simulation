@@ -603,7 +603,7 @@ class KalmanFilter:
             AllStateNum = windowsize * 6 + StateLandmark
             TotalObsNum = 0
             B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            for LocalID, frame in LocalFrames_gt.items():
+            for LocalID, frame in LocalFrames.items():
                 tec, Rec = frame.m_pos, frame.m_rota
                 features = frame.m_features
                 obsnum = len(features) * 3
@@ -728,7 +728,7 @@ class KalmanFilter:
 
             #TODO: 1. solve CLS problem by marginalizing landmark
             B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            for LocalID, frame in LocalFrames_gt.items():
+            for LocalID, frame in LocalFrames.items():
                 tec, Rec = frame.m_pos, frame.m_rota
                 features = frame.m_features
                 obsnum = len(features) * 3
@@ -752,10 +752,11 @@ class KalmanFilter:
             for j in range(Local):  
                 LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
                 LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+            StateFrameNum = windowsize * 6
 
-            # for id_ in self.m_MapPoints.keys():
-            #     position = self.m_MapPoints[id_]
-            #     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
+            for id_ in self.m_MapPoints.keys():
+                position = self.m_MapPoints[id_]
+                self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
 
             # 3. remove old frame and its covariance
             for _id in range(Local - 1):

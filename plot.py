@@ -11,8 +11,8 @@ import plotmain as main
 
 
 #%% init result file
-prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/exp3-NormalCLSandFilter/"
-name = "result.txt.-1s.FilterAllState.Noise"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
+name = "result.txt.-1s.CLS_SW.Noise"
 path_to_output = prefix + name
 
 
@@ -24,11 +24,11 @@ time -= time[0]
 # define attribute
 plotAttributes = {}
 posAttributes = {}
-posAttributes["ylabel"] = "Error(m)"
+posAttributes["ylabel"] = "Position Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 70]
-posAttributes["ylim"] = [-2, 2]
+posAttributes["ylim"] = [-1, 1]
 posAttributes["scientific"] = True
 
 posSubAtt = {}
@@ -64,11 +64,11 @@ velAttributes["subplot"] = velSubAtt
 
 
 attAttributes = {}
-attAttributes["ylabel"] = "Error(Deg)"
+attAttributes["ylabel"] = "Attitude Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 70]
-attAttributes["ylim"] = [-3, 3]
+attAttributes["ylim"] = [-1, 1]
 attAttributes["scientific"] = True
 
 

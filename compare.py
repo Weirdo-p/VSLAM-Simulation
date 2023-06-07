@@ -69,8 +69,8 @@ plotAttributes['vel'] = velAttributes
 plotAttributes['att'] = attAttributes
 
 orders = ["pos", "att"]
-prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/exp3-NormalCLSandFilter/"
-cmp = "CLS_FilterAll"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
+cmp = "CLS_Filter_1"
 names = [".CLS_Seq", ".CLS"]
 
 # errors = {}
@@ -96,8 +96,8 @@ names = [".CLS_Seq", ".CLS"]
 # # print(errors[names[0]].reshape(dim1, dim2))
 # time = errors[names[0]][:, 0]
 
-CLS = np.loadtxt(prefix + "result.txt.-1s.CLS_Seq.Noise")
-Filter = np.loadtxt(prefix + "result.txt.-1s.FilterAllState.Noise")
+CLS = np.loadtxt(prefix + "result.txt.-1s.CLS_SW.Noise")
+Filter = np.loadtxt(prefix + "result.txt.-1s.CLS_SW_Marg.Noise")
 
 time = CLS[:, 0]
 time -= time[0]
