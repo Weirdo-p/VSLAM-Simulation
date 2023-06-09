@@ -23,6 +23,8 @@ class Camera:
             xyz (ndarray): point in camera frame with shape(3, 1)
         """
         uv = np.zeros((3, 1))
+        if (np.isnan(xyz[0, 0]) or np.isnan(xyz[1, 0]) or np.isnan(xyz[2, 0])):
+            print("invalid")
         if self.m_type == CameraType().STEREO:
             uv[0, 0] = self.m_fx * xyz[0, 0] / xyz[2, 0] + self.m_cx
             uv[1, 0] = self.m_fy * xyz[1, 0] / xyz[2, 0] + self.m_cy
@@ -52,4 +54,7 @@ class Camera:
             xyz[2, 0] = 1
 
         return xyz
+
+    def getBaseline(self):
+        return self.m_b / self.m_fx
 

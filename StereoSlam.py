@@ -10,7 +10,7 @@ from filter import *
 from coors import *
 import plotmain
 import os
-
+np.seterr(all="raise")
 from scipy.spatial.transform import Rotation as R
 
 
@@ -796,69 +796,105 @@ class StereoSlam:
         # construct information matrix, residual, and weight matrix
         # since here we just obtain intial value, both SWF and SWO
         # use Least Square directly
-        ParamNum = len(pairs) * 3 + 12
-        N, b = np.zeros((ParamNum, ParamNum)), np.zeros((ParamNum, 1))
+        ParamNum = 6
         fx, fy, intrin_b = self.m_camera.m_fx, self.m_camera.m_fy, self.m_camera.m_b
         
         pfeats, nfeats = list(pairs.keys()), list(pairs.values())
         TwoFeatures = [pfeats, nfeats]
         TwoFrames = [pframe, nframe]
         for iter in range(3):
-            for frame_pos in range(len(TwoFrames)):
-                frame = TwoFrames[frame_pos]
-                pRwc, pPwc = frame.m_rota, frame.m_pos
-                for i in range(len(TwoFeatures[frame_pos])):
-                    pfeat = TwoFeatures[frame_pos][i]
-                    PointPos = pfeat.m_mappoint.m_pos
-                    PointPos_c = pRwc @ (PointPos - pPwc)
-                    uv = self.m_camera.project(PointPos_c)
+            N, b = np.zeros((ParamNum, ParamNum)), np.zeros((ParamNum, 1))
+            pRwc, pPwc = nframe.m_rota, nframe.m_pos
+            for i in range(len(nfeats)):
+                pfeat = nfeats[i]
+                if pfeat.m_buse == False:
+                    continue
+                PointPos = pfeat.m_mappoint.m_pos
+                PointPos_c = pRwc @ (PointPos - pPwc)
+                uv = self.m_camera.project(PointPos_c)
 
-                    # PointPos_c = pfeat.m_PosInCamera
-                    J, P, L = np.zeros((3, ParamNum)), np.identity(3), np.zeros((3, 1))
-                    
-                    J_cam = Jacobian_rcam(pRwc, PointPos_c, fx, fy, intrin_b)
-                    Jphi = Jacobian_phai(pRwc, pPwc, PointPos, PointPos_c, fx, fy, intrin_b)
-                    JPoint = Jacobian_Point(pRwc, PointPos_c, fx, fy, intrin_b)
+                # PointPos_c = pfeat.m_PosInCamera
+                J, P, L = np.zeros((3, ParamNum)), np.identity(3), np.zeros((3, 1))
+                
+                J_cam = Jacobian_rcam(pRwc, PointPos_c, fx, fy, intrin_b)
+                Jphi = Jacobian_phai(pRwc, pPwc, PointPos, PointPos_c, fx, fy, intrin_b)
 
-                    J[: 3, frame_pos * 6: frame_pos * 6 + 3] = J_cam
-                    J[:3, frame_pos * 6 + 3: frame_pos * 6 + 6] = Jphi
-                    J[:3, 12 + i * 3: 12 + (i + 1) * 3] = JPoint
+                J[: 3, 0: 3] = J_cam
+                J[:3, 3: 6] = Jphi
 
-                    P = P * (1 / (self.m_filter.m_PixelStd ** 2))
-                    uv_obs = pfeat.m_pos
-                    L[:] = uv - uv_obs
+                P = P * (1 / (self.m_filter.m_PixelStd ** 2))
+                uv_obs = pfeat.m_pos
+                L[:] = uv - uv_obs
 
-                    N += J.transpose() @ P @ J
-                    b += J.transpose() @ P @ L
-            N_prior = np.identity(6) * 1E6
-            N[:6, :6] += N_prior
-            np.savetxt("./debug/N.txt", N)
+                N += J.transpose() @ P @ J
+                b += J.transpose() @ P @ L
+            # N_prior = np.identity(6) * 1E6
+            # N[:6, :6] += N_prior
+            # np.savetxt("./debug/N.txt", N)
             dx = np.linalg.inv(N) @ b
-            print(dx)
-            pos = 0
-            for frame in TwoFrames:
-                frame.m_pos = frame.m_pos - dx[pos * 6: pos * 6 + 3, :]
-                frame.m_rota = frame.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[pos * 6 + 3: pos * 6 + 6, :]))
-                pos += 1
-            pos = 12
-            for i in range(len(pfeats)):
-                mappoint = pfeats[i].m_mappoint
-                mappoint.m_pos -= dx[pos: pos + 3, :]
+            # print(dx)
+            nframe.m_pos = nframe.m_pos - dx[0: 3, :]
+            nframe.m_rota = nframe.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[3: 6, :]))
+        self.ProjectLandmarks(nframe)
+    
+    def removeOutlier(self, matchedframe, matchedFeature, iteration):
+        """_summary_
+
+        Args:
+            matchedFrame (_type_): _description_
+            matchedFeature (_type_): _description_
+            iteration (_type_): _description_
+
+        Returns:
+            int: number of removed landmarks
+        """
+        threshold = 10
+        if iteration >= 2:
+            threshold = 3        
+        
+        pfeatures, nfeatures = matchedFeature[0], matchedFeature[1]
+        pframe, nframe = matchedframe[0], matchedframe[1]
+        pRwc, pPwc = pframe.m_rota, pframe.m_pos
+        nRwc, nPwc = nframe.m_rota, nframe.m_pos
+
+        numRemove, featureNum = 0, len(pfeatures)
+        i = 0
+        while i < featureNum:
+            PointPos = pfeatures[i].m_mappoint.m_pos
+            pPointPos_c = pRwc @ (PointPos - pPwc)
+            puv = self.m_camera.project(pPointPos_c)
+            puv_obs = pfeatures[i].m_pos
+
+            nPointPos_c = nRwc @ (PointPos - nPwc)
+            nuv = self.m_camera.project(nPointPos_c)
+            nuv_obs = nfeatures[i].m_pos
+
+            nremoved, premoved = False, False
+            if np.linalg.norm(puv - puv_obs, 2) > threshold:
+                premoved = True
+                pfeatures[i].m_buse = False
+            if np.linalg.norm(nuv - nuv_obs, 2) > threshold:
+                nremoved = True
+                nfeatures[i].m_buse = False
             
+            if (pfeatures[i].m_buse == False and nfeatures[i].m_buse == False) or pPointPos_c[2, 0] <= 0 or nPointPos_c[2, 0] <= 0:
+                pfeatures[i].m_mappoint.m_buse = False
+                del pfeatures[i]
+                del nfeatures[i]
+                numRemove += 1
+                i -= 1
+            featureNum = len(pfeatures)
+            i += 1
 
-# for j in range(Local):  
-#     LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
-#     LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-# StateFrameNum = windowsize * 6
+        return numRemove
 
-# for id_ in self.m_MapPoints.keys():
-#     position = self.m_MapPoints[id_]
-#     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
-
-# # 3. remove old frame and its covariance
-# for _id in range(Local - 1):
-#     LocalFrames_gt[_id] = LocalFrames_gt[_id + 1]
-#     LocalFrames[_id] = LocalFrames[_id + 1]
+    def ProjectLandmarks(self, frame):
+        for feat in frame.m_features:
+            Rc, rc = frame.m_rota, frame.m_pos
+            mappoint = feat.m_mappoint
+            if np.linalg.norm(mappoint.m_pos) != 0:
+                continue
+            mappoint.m_pos = rc + np.linalg.inv(Rc) @ feat.m_PosInCamera
 
 
     def findCorrespond(self, pframe, nframe):
@@ -867,6 +903,8 @@ class StereoSlam:
             mappoint = pfeat.m_mappoint
             for obs in mappoint.m_obs:
                 if obs in nframe.m_features:
+                    if obs.m_buse == False and pfeat.m_buse == False:
+                        continue
                     pairs[pfeat] = obs
                     continue
 

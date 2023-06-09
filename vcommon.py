@@ -45,6 +45,7 @@ class Feature:
         self.m_mappoint = None
         self.m_frame = None
         self.m_btriangulate = False
+        self.m_buse = True
 
     def __deepcopy__(self, memo):
         print("feature copy")
@@ -63,7 +64,7 @@ class MapPoint:
         self.m_pos  = pos                       # 三维点世界坐标系的坐标
         self.m_id   = mapPointId                # ID              
         self.m_obs  = []                        # observations (features)
-        self.m_bused = False
+        self.m_buse = True
 
     def __deepcopy__(self, memo):
         print("mappoint copy")
@@ -131,7 +132,7 @@ class Map:
         useful = 0
         for id, point in self.m_points.items():
             if len(point.m_obs) >= 2:
-                point.m_bused = True
+                point.m_buse = True
                 useful += 1
         return useful
 
@@ -141,11 +142,46 @@ class Map:
         Args:
             feature (ndarray): vcommon.Feature object
         """
-        xyz = self.m_camera.lift(feature.m_pos)
+        # baseline: from left to right camera
+        baseline = self.m_camera.getBaseline()
+        rPc = np.array([[baseline], [0], [0]])
+        rRc = np.identity(3)
 
-        if (xyz[2, 0] <= 0):
+        lPc = np.zeros((3, 1))
+        lRc = np.identity(3)
+
+        luv = np.array((feature.m_pos))
+        ruv = np.array((feature.m_pos))
+        # print(ruv)
+        ruv[0, 0] = ruv[0, 0] - luv[2, 0]
+        # print(ruv)
+
+        lxyz = self.m_camera.lift(luv)
+        lxyz = lxyz / lxyz[2, 0]
+
+        rxyz = self.m_camera.lift(ruv)
+        rxyz = rxyz / rxyz[2, 0]
+
+        Pj = np.zeros((3, 1))
+
+        for i in range(2):
+            J, l = np.zeros((4, 3)), np.zeros((4, 1))
+            J[0, :] = -lRc[1, :] + lxyz[1, 0] * lRc[2, :]
+            J[1, :] =  lRc[0, :] - lxyz[0, 0] * lRc[2, :]
+            J[2, :] = -rRc[1, :] + rxyz[1, 0] * rRc[2, :]
+            J[3, :] =  rRc[0, :] - rxyz[0, 0] * rRc[2, :]
+
+            l[:2, :] = J[:2, :] @ (Pj - lPc)
+            l[2:, :] = J[2:, :] @ (Pj - rPc)
+
+            # print(J)
+
+            dx = np.linalg.inv(J.transpose() @ J) @ J.transpose() @ l
+            Pj = Pj - dx
+
+        if (Pj[2, 0] <= 0):
             return False
-        feature.m_PosInCamera = xyz
+        feature.m_PosInCamera = Pj
         
         return True
 
