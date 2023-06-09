@@ -726,7 +726,7 @@ class KalmanFilter:
             tmp = (windowsize - 1) * 6
             self.m_StateCov[tmp: StateFrameSize, tmp: StateFrameSize] = PoseCov
 
-            #TODO: 1. solve CLS problem by marginalizing landmark
+            # 1. solve CLS problem by marginalizing landmark
             B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
             for LocalID, frame in LocalFrames.items():
                 tec, Rec = frame.m_pos, frame.m_rota
@@ -981,3 +981,9 @@ class KalmanFilter:
             J[row * 3: row * 3 + 3, FrameStateNum + PointIndex : FrameStateNum + PointIndex + 3] = JPoint
 
         return J, l
+
+    def solveSW_Kitti(self, frames, camera, map, windowsize=20, iteration=1):
+        pass
+
+        
+

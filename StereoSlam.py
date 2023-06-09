@@ -9,6 +9,7 @@ from vcommon import *
 from filter import *
 from coors import *
 import plotmain
+import os
 
 from scipy.spatial.transform import Rotation as R
 
@@ -41,7 +42,26 @@ class StereoSlam:
                     i_frame += 1
                 else:
                     break
-    
+        
+    def readFeatureFile(self, path_features):
+        for path_feat in path_features:
+            frame = Frame()
+            # time = os.path.basename(path_feat)
+            # time = time[: len(time) - 4]
+
+            # frame.m_id = time
+            # frame.m_time = time
+
+            with open(path_feat, "r") as f:
+                features, sow = self.__parseFeatureFileKitti(path_feat)
+                frame.m_features = features
+                frame.m_time = sow
+                frame.m_id = sow
+                for feat in features:
+                    feat.m_frame = frame
+            self.m_frames.append(frame)
+
+
     def plot(self):
         path, points = [], []
 
@@ -124,12 +144,38 @@ class StereoSlam:
                     break
         return features, sow
 
+    def __parseFeatureFileKitti(self, feature_file):
+        i_line = 0
+        features = []
+        with open(feature_file) as f:
+            while True:
+                line = f.readline()
+                if i_line == 0:
+                    items = line.split()
+                    id, sow = int(items[0]), float(items[1])
+                    i_line += 1
+                    continue
+                if line:
+                    features.append(self.__parseFeatureLine(line))
+                else: 
+                    break
+        return features, sow
+
+
     def __parseFeatureLine(self, line = str()):
         items = line.split()
 
         MappointId, u, v, du = int(items[0]), float(items[1]), float(items[2]), float(items[3])
         feature = Feature(np.array([[u], [v], [du]]), du, MappointId)
 
+        if MappointId not in self.m_map.m_points.keys():
+            # mappoint = MapPoint()
+            # mappoint.m_id = MappointId
+            # mappoint.m_obs.append(feature)
+            # self.m_map.m_points[MappointId] = mappoint
+            # feature.m_mappoint = mappoint
+            return feature
+        
         mappoint = self.m_map.m_points[MappointId]
         feature.m_mappoint = mappoint
         mappoint.m_obs.append(feature)
@@ -720,3 +766,108 @@ class StereoSlam:
                 gt_position = firstRec @ (frame.m_pos - firstTec)
                 frame_i += 1
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
+
+
+    def runKittiVIO_FilterMarg(self, path_to_output, path_gt, windowsize=20, iteration=1):
+        self.m_map.m_points.clear()
+
+        FrameNumInWindow = 0
+        for frame in self.m_frames:
+            # 1. find correspondences
+            if FrameNumInWindow < windowsize:
+                self.m_map.addNewFrame(frame)
+                FrameNumInWindow += 1
+                self.TrackLastFrame()
+                continue
+            self.m_map.check()
+        pass
+
+    def TrackLastFrame(self):
+        """solve initial value for the latest frame
+        """
+
+        FrameNum = len(self.m_map.m_frames)
+        if FrameNum <= 1:
+            return
+        nframe = self.m_map.m_frames[FrameNum - 1]
+        pframe = self.m_map.m_frames[FrameNum - 2]
+        pairs = self.findCorrespond(pframe, nframe)
+
+        # construct information matrix, residual, and weight matrix
+        # since here we just obtain intial value, both SWF and SWO
+        # use Least Square directly
+        ParamNum = len(pairs) * 3 + 12
+        N, b = np.zeros((ParamNum, ParamNum)), np.zeros((ParamNum, 1))
+        fx, fy, intrin_b = self.m_camera.m_fx, self.m_camera.m_fy, self.m_camera.m_b
+        
+        pfeats, nfeats = list(pairs.keys()), list(pairs.values())
+        TwoFeatures = [pfeats, nfeats]
+        TwoFrames = [pframe, nframe]
+        for iter in range(3):
+            for frame_pos in range(len(TwoFrames)):
+                frame = TwoFrames[frame_pos]
+                pRwc, pPwc = frame.m_rota, frame.m_pos
+                for i in range(len(TwoFeatures[frame_pos])):
+                    pfeat = TwoFeatures[frame_pos][i]
+                    PointPos = pfeat.m_mappoint.m_pos
+                    PointPos_c = pRwc @ (PointPos - pPwc)
+                    uv = self.m_camera.project(PointPos_c)
+
+                    # PointPos_c = pfeat.m_PosInCamera
+                    J, P, L = np.zeros((3, ParamNum)), np.identity(3), np.zeros((3, 1))
+                    
+                    J_cam = Jacobian_rcam(pRwc, PointPos_c, fx, fy, intrin_b)
+                    Jphi = Jacobian_phai(pRwc, pPwc, PointPos, PointPos_c, fx, fy, intrin_b)
+                    JPoint = Jacobian_Point(pRwc, PointPos_c, fx, fy, intrin_b)
+
+                    J[: 3, frame_pos * 6: frame_pos * 6 + 3] = J_cam
+                    J[:3, frame_pos * 6 + 3: frame_pos * 6 + 6] = Jphi
+                    J[:3, 12 + i * 3: 12 + (i + 1) * 3] = JPoint
+
+                    P = P * (1 / (self.m_filter.m_PixelStd ** 2))
+                    uv_obs = pfeat.m_pos
+                    L[:] = uv - uv_obs
+
+                    N += J.transpose() @ P @ J
+                    b += J.transpose() @ P @ L
+            N_prior = np.identity(6) * 1E6
+            N[:6, :6] += N_prior
+            np.savetxt("./debug/N.txt", N)
+            dx = np.linalg.inv(N) @ b
+            print(dx)
+            pos = 0
+            for frame in TwoFrames:
+                frame.m_pos = frame.m_pos - dx[pos * 6: pos * 6 + 3, :]
+                frame.m_rota = frame.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[pos * 6 + 3: pos * 6 + 6, :]))
+                pos += 1
+            pos = 12
+            for i in range(len(pfeats)):
+                mappoint = pfeats[i].m_mappoint
+                mappoint.m_pos -= dx[pos: pos + 3, :]
+            
+
+# for j in range(Local):  
+#     LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
+#     LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+# StateFrameNum = windowsize * 6
+
+# for id_ in self.m_MapPoints.keys():
+#     position = self.m_MapPoints[id_]
+#     self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
+
+# # 3. remove old frame and its covariance
+# for _id in range(Local - 1):
+#     LocalFrames_gt[_id] = LocalFrames_gt[_id + 1]
+#     LocalFrames[_id] = LocalFrames[_id + 1]
+
+
+    def findCorrespond(self, pframe, nframe):
+        pairs = {}
+        for pfeat in pframe.m_features:
+            mappoint = pfeat.m_mappoint
+            for obs in mappoint.m_obs:
+                if obs in nframe.m_features:
+                    pairs[pfeat] = obs
+                    continue
+
+        return pairs

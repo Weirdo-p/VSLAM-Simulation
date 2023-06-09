@@ -4,6 +4,7 @@ from unittest import TestResult
 import numpy as np
 import math
 import copy
+from camera import *
 
 
 PI = math.pi
@@ -38,10 +39,12 @@ class Frame:
 class Feature:
     def __init__(self, pos = np.zeros([3, 1]), du = 0, mapPointId = -1):
         self.m_pos = pos                    # pixels
+        self.m_PosInCamera = np.zeros([3, 1])
         self.m_du = du           
         self.m_mapPointId = mapPointId      # 该像素对应的地图点（三维点）Id
         self.m_mappoint = None
         self.m_frame = None
+        self.m_btriangulate = False
 
     def __deepcopy__(self, memo):
         print("feature copy")
@@ -60,6 +63,7 @@ class MapPoint:
         self.m_pos  = pos                       # 三维点世界坐标系的坐标
         self.m_id   = mapPointId                # ID              
         self.m_obs  = []                        # observations (features)
+        self.m_bused = False
 
     def __deepcopy__(self, memo):
         print("mappoint copy")
@@ -73,7 +77,9 @@ class MapPoint:
 class Map:
     def __init__(self):
         self.m_points = {}                      # observations
-
+        self.m_frames = []                      # frames
+        self.m_bFirstFrame = True
+        self.m_camera = Camera(0, 0, 0, 0, 0)
 
     def __parseLine(self, line=str()):
         items = line.split()
@@ -97,6 +103,53 @@ class Map:
                     # print(line)
                 else:
                     break
+    
+    def addNewFrame(self, frame):
+        # 1. add frames
+        self.m_frames.append(frame)
+
+        # 2. add landmarks
+        for feat in frame.m_features:
+            pointID = feat.m_mapPointId
+            if pointID not in self.m_points.keys():
+                mappoint = MapPoint()
+                mappoint.m_id = pointID
+                self.m_points[pointID] = mappoint
+
+            # triangulate points in camera frame
+            if feat.m_btriangulate == False:
+                # points in world frame equals to points in 
+                # camera frame if it is the first frame
+                if (self.TriangulateByStereo(feat) and self.m_bFirstFrame):
+                    self.m_points[pointID].m_pos = feat.m_PosInCamera
+
+            self.m_points[pointID].m_obs.append(feat)
+            feat.m_mappoint = self.m_points[pointID]
+        self.m_bFirstFrame = False
+    
+    def check(self):
+        useful = 0
+        for id, point in self.m_points.items():
+            if len(point.m_obs) >= 2:
+                point.m_bused = True
+                useful += 1
+        return useful
+
+    def TriangulateByStereo(self, feature):
+        """Solve points in camera frame(left)
+
+        Args:
+            feature (ndarray): vcommon.Feature object
+        """
+        xyz = self.m_camera.lift(feature.m_pos)
+
+        if (xyz[2, 0] <= 0):
+            return False
+        feature.m_PosInCamera = xyz
+        
+        return True
+
+
 
 
 def rot2att(rotation):
