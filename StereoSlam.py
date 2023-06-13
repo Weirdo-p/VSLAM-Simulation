@@ -780,6 +780,24 @@ class StereoSlam:
                 self.TrackLastFrame()
                 continue
             self.m_map.check()
+
+
+    def runKittiVIO_CLSMarg(self, path_to_output, path_gt, windowsize=20, iteration=1):
+        self.m_map.m_points.clear()
+
+        FrameNumInWindow = 0
+        for frame in self.m_frames:
+            # 1. find correspondences
+            if FrameNumInWindow < windowsize:
+                self.m_map.addNewFrame(frame)
+                FrameNumInWindow += 1
+                if (self.TrackLastFrame() == False):
+                    #TODO: remove the latest frame and its observations
+                    pass
+                # continue
+            self.m_estimator.solveKitti(self.m_map, self.m_camera, windowsize)
+    
+    def removeLatestFrame(self):
         pass
 
     def TrackLastFrame(self):
@@ -790,27 +808,27 @@ class StereoSlam:
         if FrameNum <= 1:
             return
         nframe = self.m_map.m_frames[FrameNum - 1]
-        pframe = self.m_map.m_frames[FrameNum - 2]
-        pairs = self.findCorrespond(pframe, nframe)
+        usedLandmarks = self.findCorrespond(nframe)
 
         # construct information matrix, residual, and weight matrix
         # since here we just obtain intial value, both SWF and SWO
         # use Least Square directly
         ParamNum = 6
         fx, fy, intrin_b = self.m_camera.m_fx, self.m_camera.m_fy, self.m_camera.m_b
-        
-        pfeats, nfeats = list(pairs.keys()), list(pairs.values())
-        TwoFeatures = [pfeats, nfeats]
-        TwoFrames = [pframe, nframe]
+        print(len(usedLandmarks), "tracked")
+        if len(usedLandmarks) < 2:
+            print("used", len(usedLandmarks), "landmarks")
+            return False
         for iter in range(3):
             N, b = np.zeros((ParamNum, ParamNum)), np.zeros((ParamNum, 1))
             pRwc, pPwc = nframe.m_rota, nframe.m_pos
-            for i in range(len(nfeats)):
-                pfeat = nfeats[i]
-                if pfeat.m_buse == False:
+            for i in range(len(nframe.m_features)):
+                pfeat = nframe.m_features[i]
+                if pfeat.m_mappoint not in usedLandmarks:
                     continue
                 PointPos = pfeat.m_mappoint.m_pos
                 PointPos_c = pRwc @ (PointPos - pPwc)
+                pfeat.m_PosInCamera = PointPos_c.copy()
                 uv = self.m_camera.project(PointPos_c)
 
                 # PointPos_c = pfeat.m_PosInCamera
@@ -828,14 +846,12 @@ class StereoSlam:
 
                 N += J.transpose() @ P @ J
                 b += J.transpose() @ P @ L
-            # N_prior = np.identity(6) * 1E6
-            # N[:6, :6] += N_prior
             # np.savetxt("./debug/N.txt", N)
             dx = np.linalg.inv(N) @ b
-            # print(dx)
             nframe.m_pos = nframe.m_pos - dx[0: 3, :]
             nframe.m_rota = nframe.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[3: 6, :]))
         self.ProjectLandmarks(nframe)
+        return True
     
     def removeOutlier(self, matchedframe, matchedFeature, iteration):
         """_summary_
@@ -894,18 +910,41 @@ class StereoSlam:
             mappoint = feat.m_mappoint
             if np.linalg.norm(mappoint.m_pos) != 0:
                 continue
+            
+            feat.m_PosInCamera = self.m_camera.lift(feat.m_pos)
             mappoint.m_pos = rc + np.linalg.inv(Rc) @ feat.m_PosInCamera
 
 
-    def findCorrespond(self, pframe, nframe):
-        pairs = {}
-        for pfeat in pframe.m_features:
-            mappoint = pfeat.m_mappoint
-            for obs in mappoint.m_obs:
-                if obs in nframe.m_features:
-                    if obs.m_buse == False and pfeat.m_buse == False:
-                        continue
-                    pairs[pfeat] = obs
-                    continue
+    # def findCorrespond(self, pframe, nframe):
+    #     pairs = {}
+    #     count_feat = 0
+    #     count_land = 0
+    #     num = 0
+    #     for pfeat in pframe.m_features:
+    #         mappoint = pfeat.m_mappoint
+    #         if mappoint.m_buse == False:
+    #             count_land += 1
+    #             continue
+    #         for obs in mappoint.m_obs:
+    #             if obs in nframe.m_features:
+    #                 num += 1
+    #                 if obs.m_buse == False and pfeat.m_buse == False:
+    #                     count_feat += 1
+    #                     continue
+    #                 pairs[pfeat] = obs
+    #                 continue
+    #     print(num, "pairs found, ", count_feat, "reject")
+    #     return pairs
 
-        return pairs
+    def findCorrespond(self, nframe):
+        usedLandmarks = []
+        for feat in nframe.m_features:
+            mappoint = feat.m_mappoint
+            if mappoint.m_buse < 1:
+                continue
+            if np.linalg.norm(mappoint.m_pos, 2) == 0:
+                continue
+            usedLandmarks.append(mappoint)
+        
+        return usedLandmarks
+

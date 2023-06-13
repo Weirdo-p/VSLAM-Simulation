@@ -22,5 +22,18 @@ b =  3.861448000000e+02
 cam = Camera(fx, fy, cx, cy, b)
 kitti_slam.m_camera = cam
 kitti_slam.m_map.m_camera = cam
+PhiPose, QPose, QPoint, PosStd, AttStd, PointStd, PixelStd = np.identity(6),np.identity(6) * 0, 0, 100, 100 * D2R, 100, 3
 
-kitti_slam.runKittiVIO_FilterMarg(path_to_output, "./")
+kitti_slam.m_filter.m_PhiPose = PhiPose
+kitti_slam.m_filter.m_QPose = QPose
+kitti_slam.m_filter.m_QPoint = QPoint
+kitti_slam.m_filter.m_PosStd = PosStd
+kitti_slam.m_filter.m_AttStd = AttStd
+kitti_slam.m_filter.m_PointStd = PointStd
+kitti_slam.m_filter.m_PixelStd = PixelStd
+kitti_slam.m_estimator.m_PixelStd = PixelStd
+kitti_slam.m_estimator.m_PosStd = PosStd
+kitti_slam.m_estimator.m_AttStd = AttStd
+kitti_slam.m_estimator.m_PointStd = PointStd
+
+kitti_slam.runKittiVIO_CLSMarg(path_to_output, "./")

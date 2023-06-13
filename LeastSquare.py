@@ -151,6 +151,18 @@ class CLS:
             self.m_MapPoints_Point[mappointID] = mappoint
             self.m_MapPointPos += 3
     
+    def __addFeaturesKitti(self, features):
+        for feat in features:
+            mappoint = feat.m_mappoint
+            if mappoint.m_buse < 1:
+                continue
+            mappointID = mappoint.m_id
+            if mappointID in self.m_MapPoints.keys():
+                continue
+            self.m_MapPoints[mappointID] = self.m_MapPointPos
+            self.m_MapPoints_Point[mappointID] = mappoint
+            self.m_MapPointPos += 3
+
 
     def solveSequential(self, frames, camera, maxtime=-1, iteration=1):
         LastTime = maxtime
@@ -536,6 +548,135 @@ class CLS:
             StateFrame[tmp:, :] = 0
             self.marginalization(N, b, windowsize)
         return frames
+
+    def solveKitti(self, map, camera, windowsize=20):
+        Map().m_frames  
+        Map().m_points
+
+        frames = map.m_frames
+        mappoints = map.m_points
+
+        if len(frames) < 2:
+            return 
+        windowsize_tmp = len(frames)
+
+        StateFrameSize = len(frames) * 6
+        PoseCov = np.identity(6)
+        PoseCov[:3, :3] *= (self.m_PosStd ** 2)
+        PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
+
+        prevstate = None
+        for iter in range(10):
+            # 1. search for observations and landmarks
+            self.m_MapPoints = {}
+            self.m_MapPoints_Point = {}
+            self.m_MapPointPos = 0
+            nobs = 0
+            for LocalId in range(len(frames)):
+                frame = frames[LocalId]
+                nobs += len(frame.m_features) * 3
+                self.__addFeaturesKitti(frame.m_features)
+            StateLandmark = len(self.m_MapPoints) * 3
+
+            if len(self.m_LandmarkLocal) == 0:
+                self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
+                j = 0
+                while True:
+                    self.m_StateCov[j: j + 6, j: j + 6] = PoseCov
+                    j += 6
+
+                    if j >= StateFrameSize:
+                        break
+                self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+                tmp = (windowsize_tmp - 1) * 6
+                self.m_StateCov[tmp: StateFrameSize, tmp:StateFrameSize] = PoseCov
+            # 1. solve CLS problem by marginalizing landmark
+            AllStateNum = windowsize_tmp * 6 + StateLandmark
+            TotalObsNum = 0
+            N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
+            StateFrame = np.zeros((windowsize_tmp * 6, 1))
+            for LocalID in range(len(frames)):
+                frame = frames[LocalID]
+                tec, Rec = frame.m_pos, frame.m_rota
+                features = frame.m_features
+                
+                J, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
+                obsnum = l.shape[0]
+                P_obs = np.identity(l.shape[0]) * (1.0 / (self.m_PixelStd ** 2))
+                N += J.transpose() @ P_obs @ J
+                b += J.transpose() @ P_obs @ l
+                TotalObsNum += obsnum
+            
+            NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
+
+            if len(self.m_LandmarkLocal) == 0:
+                N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000
+            state = np.linalg.inv(N + NPrior) @ (b + bPrior)
+            StateFrame = state[: windowsize_tmp * 6]
+
+            for j in range(windowsize_tmp):  
+                frames[j].m_pos =  frames[j].m_pos - state[j * 6: j * 6 + 3, :]
+                frames[j].m_rota = frames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+            StateFrameNum = windowsize_tmp * 6
+            for id_ in self.m_MapPoints.keys():
+                position = self.m_MapPoints[id_]
+                self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
+            self.check(map, camera)
+
+            if iter >= 1 and np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2) < 1E-2:
+                break
+            if iter != 9:
+                prevstate = state
+        print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
+        # self.m_StateCov = np.linalg.inv(N)[: windowsize_tmp * 6, : windowsize_tmp * 6]
+        # tmp = (windowsize_tmp - 1) * 6
+        # self.m_StateCov[: tmp, : tmp] = self.m_StateCov[6: , 6: ]
+        # self.m_StateCov[tmp:, :] = 0
+        # self.m_StateCov[:, tmp: ] = 0
+        # # Local -= 1
+        # StateFrame[: tmp, :] = StateFrame[6:, :]
+        # StateFrame[tmp:, :] = 0
+        if windowsize_tmp == windowsize:
+            self.marginalization(N, b, windowsize_tmp)
+        count = 0
+        for id, point in mappoints.items():
+            if point.m_buse == -1:
+                continue
+            # if len(point.m_obs) > 4:
+            #     point.m_buse = 1
+                # continue
+            # point.m_buse = True
+            count += 1
+            for obs in point.m_obs:
+                obs.m_buse = True
+        print("used landmarks: ", count)
+        return frames
+    
+    def check(self, map, camera):
+        mappoints = map.m_points
+        for id, point in mappoints.items():
+            if point.m_buse == -1:
+                continue
+            
+            for obs in point.m_obs:
+                tc, Rc = obs.m_frame.m_pos, obs.m_frame.m_rota
+                point_cam = Rc @ (point.m_pos - tc)
+                if point_cam[2, 0] < 0 or point_cam[2, 0] > 100:
+                    point.m_buse = -1
+                
+                resi = camera.project(point_cam) - obs.m_pos
+                if np.abs(resi[0]) > 3 or np.abs(resi[1])> 3:
+                    point.m_buse = 0
+
+            count = 0
+            for obs in point.m_obs:
+                if obs.m_buse == False:
+                    count += 1
+            
+            if count == len(point.m_obs):
+                point.m_buse = 0
+            
+            
     
     def marginalization(self, N, b, WindowSize):
         # step 1: check connected states
@@ -604,7 +745,7 @@ class CLS:
 
         NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
         if len(self.m_LandmarkLocal) == 0:
-            B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            L = np.zeros((StateNum, 1))
             P = np.zeros((StateNum, StateNum))
             B = np.identity(StateNum)
             P = np.linalg.inv(self.m_StateCov)
@@ -691,5 +832,50 @@ class CLS:
             J[row * 3: row * 3 + 3, LocalID * 6 : LocalID * 6 + 3] = Jrcam
             J[row * 3: row * 3 + 3, LocalID * 6 + 3 : LocalID * 6 + 6] = Jphi
             J[row * 3: row * 3 + 3, FrameStateNum + PointIndex : FrameStateNum + PointIndex + 3] = JPoint
+
+        return J, l
+
+
+    def setMEQ_Kitti(self, tec, Rec, features, camera, windowsize, LocalID):
+
+        statenum = windowsize * 6 + len(self.m_MapPoints) * 3
+        obsnum = 0
+        FrameStateNum = windowsize * 6
+
+        for row in range(len(features)):
+            feat = features[row]
+            mappoint = feat.m_mappoint
+            if mappoint.m_buse >= 1:
+                obsnum += 1
+
+        J, l = np.zeros((obsnum * 3, statenum)), np.zeros((obsnum * 3, 1))
+        fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
+
+        row = 0
+        for i in range(len(features)):
+            feat = features[i]
+            mappoint = feat.m_mappoint
+            if mappoint.m_buse < 1:
+                continue
+            if feat.m_buse == False:
+                continue
+            pointID = mappoint.m_id
+            pointPos = mappoint.m_pos
+            pointPos_c = np.matmul(Rec, (pointPos - tec))
+            uv = camera.project(pointPos_c)
+            uv_obs = feat.m_pos
+            PointIndex = self.m_MapPoints[pointID]
+            
+            l_sub = uv - uv_obs
+            l[row * 3: row * 3 + 3, :] = l_sub
+
+            Jphi = Jacobian_phai(Rec, tec, pointPos, pointPos_c, fx, fy, b)
+            Jrcam = Jacobian_rcam(Rec, pointPos_c, fx, fy, b)
+            JPoint = Jacobian_Point(Rec, pointPos_c, fx, fy, b)
+
+            J[row * 3: row * 3 + 3, LocalID * 6 : LocalID * 6 + 3] = Jrcam
+            J[row * 3: row * 3 + 3, LocalID * 6 + 3 : LocalID * 6 + 6] = Jphi
+            J[row * 3: row * 3 + 3, FrameStateNum + PointIndex : FrameStateNum + PointIndex + 3] = JPoint
+            row += 1
 
         return J, l

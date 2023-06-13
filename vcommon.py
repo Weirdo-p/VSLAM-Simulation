@@ -25,16 +25,14 @@ class Frame:
         self.m_time      = 0
 
     def __deepcopy__(self, memo):
-        print("frame copy")
-        dup = Frame(copy.deepcopy(self.m_id, memo))
+        if self in memo:
+            return memo.get(self)
+
+        dup = Frame(self.m_id, copy.deepcopy(self.m_pos, memo), copy.deepcopy(self.m_rota, memo))
         memo[self] = dup
-        dup.m_features = copy.deepcopy(self.m_features)
-        dup.m_pos = copy.deepcopy(self.m_pos)
-        dup.m_rota = copy.deepcopy(self.m_rota)
-        dup.m_time = copy.deepcopy(self.m_time)
+        dup.m_features = copy.deepcopy(self.m_features, memo)
+        dup.m_time = self.m_time
         return dup
-
-
 
 class Feature:
     def __init__(self, pos = np.zeros([3, 1]), du = 0, mapPointId = -1):
@@ -48,14 +46,20 @@ class Feature:
         self.m_buse = True
 
     def __deepcopy__(self, memo):
-        print("feature copy")
-        dup = Feature(copy.deepcopy(self.m_mapPointId, memo))
+        if self in memo:
+            return memo.get(self)
+        
+        dup = Feature(copy.deepcopy(self.m_pos, memo), self.m_du, self.m_mapPointId)
         memo[self] = dup
 
-        dup.m_du = copy.deepcopy(self.m_du)
-        dup.m_pos = copy.deepcopy(self.m_pos)
-        dup.m_frame = copy.deepcopy(self.m_frame)
-        dup.m_mappoint = copy.deepcopy(self.m_mappoint)
+        dup.m_PosInCamera = self.m_PosInCamera.copy()
+        if self.m_mappoint is not None:
+            dup.m_mappoint = copy.deepcopy(self.m_mappoint, memo)
+        if self.m_frame is not None:
+            dup.m_frame = copy.deepcopy(self.m_frame, memo)
+        dup.m_btriangulate =  self.m_btriangulate
+        dup.m_buse = self.m_buse
+
         return dup
         
 
@@ -64,14 +68,17 @@ class MapPoint:
         self.m_pos  = pos                       # 三维点世界坐标系的坐标
         self.m_id   = mapPointId                # ID              
         self.m_obs  = []                        # observations (features)
-        self.m_buse = True
+        self.m_buse = 1                         # 0 and -1: not use, >= 1: use
 
     def __deepcopy__(self, memo):
-        print("mappoint copy")
-        dup = MapPoint(copy.deepcopy(self.m_id, memo))
-        dup.m_pos = copy.deepcopy(self.m_pos)
-        dup.m_obs = copy.deepcopy(self.m_obs)
+        if self in memo:
+            return memo.get(self)        
 
+        dup = MapPoint(copy.deepcopy(self.m_pos, memo), self.m_id)
+        dup.m_buse = self.m_buse
+        memo[self] = dup
+
+        dup.m_obs = copy.deepcopy(self.m_obs, memo)
         return dup
 
 
@@ -110,29 +117,43 @@ class Map:
         self.m_frames.append(frame)
 
         # 2. add landmarks
+        count = 0
+        newpoint = 0
         for feat in frame.m_features:
             pointID = feat.m_mapPointId
             if pointID not in self.m_points.keys():
                 mappoint = MapPoint()
                 mappoint.m_id = pointID
                 self.m_points[pointID] = mappoint
+                newpoint += 1
+
+            self.m_points[pointID].m_obs.append(feat)
+            feat.m_mappoint = self.m_points[pointID]
 
             # triangulate points in camera frame
             if feat.m_btriangulate == False:
                 # points in world frame equals to points in 
                 # camera frame if it is the first frame
-                if (self.TriangulateByStereo(feat) and self.m_bFirstFrame):
-                    self.m_points[pointID].m_pos = feat.m_PosInCamera
+                if (self.TriangulateByStereo(feat) == False):
+                    feat.m_mappoint.m_buse = -1
+                else:
+                    # feat.m_mappoint.m_buse = True
+                    count += 1
+                    if self.m_bFirstFrame:
+                        self.m_points[pointID].m_pos = feat.m_PosInCamera
+        print("frame ID: ", frame.m_time, " ", count, " landmarks triangulated,", newpoint, "new found")
+        if len(self.m_frames) >= 2:
+            self.check()
 
-            self.m_points[pointID].m_obs.append(feat)
-            feat.m_mappoint = self.m_points[pointID]
         self.m_bFirstFrame = False
     
     def check(self):
         useful = 0
         for id, point in self.m_points.items():
-            if len(point.m_obs) >= 2:
-                point.m_buse = True
+            if len(point.m_obs) < 2:
+                self.m_points[id].m_buse = 0
+            else:
+                self.m_points[id].m_buse = 1
                 useful += 1
         return useful
 
@@ -180,6 +201,8 @@ class Map:
             Pj = Pj - dx
 
         if (Pj[2, 0] <= 0):
+            return False
+        if (Pj[2, 0] >=100):
             return False
         feature.m_PosInCamera = Pj
         
