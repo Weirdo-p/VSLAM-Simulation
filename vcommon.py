@@ -69,6 +69,7 @@ class MapPoint:
         self.m_id   = mapPointId                # ID              
         self.m_obs  = []                        # observations (features)
         self.m_buse = 1                         # 0 and -1: not use, >= 1: use
+        self.m_bconstrain = False
 
     def __deepcopy__(self, memo):
         if self in memo:
@@ -137,6 +138,7 @@ class Map:
                 if (self.TriangulateByStereo(feat) == False):
                     feat.m_mappoint.m_buse = -1
                 else:
+                    feat.m_btriangulate = True
                     # feat.m_mappoint.m_buse = True
                     count += 1
                     if self.m_bFirstFrame:
@@ -150,11 +152,14 @@ class Map:
     def check(self):
         useful = 0
         for id, point in self.m_points.items():
-            if len(point.m_obs) < 2:
+            if point.m_buse == -1:
+                continue
+            if len(point.m_obs) < 2 and point.m_bconstrain == False:
                 self.m_points[id].m_buse = 0
             else:
                 self.m_points[id].m_buse = 1
                 useful += 1
+        
         return useful
 
     def TriangulateByStereo(self, feature):
@@ -202,12 +207,72 @@ class Map:
 
         if (Pj[2, 0] <= 0):
             return False
-        if (Pj[2, 0] >=100):
+        if (Pj[2, 0] >=200):
             return False
         feature.m_PosInCamera = Pj
         
         return True
 
+    def triangulate(self):
+        count = 0
+        for id, point in self.m_points.items():
+            if len(point.m_obs) > 2 and point.m_buse != 1:
+                if self.TriangulateOnePoint(point) == False:
+                    point.m_buse = -1
+                    continue
+                point.m_buse = 1
+                count += 1
+        
+        return count
+
+    def TriangulateOnePoint(self, point):
+        feats = point.m_obs
+        baseline = self.m_camera.getBaseline()
+        rPc = np.array([[baseline], [0], [0]])
+        Pj = np.zeros((3, 1))
+        MapPoint().m_id
+
+        for i in range(2):
+            N, b = np.zeros((3, 3)), np.zeros((3, 1))
+            for feat in feats:
+                lPcam, lRcam = feat.m_frame.m_pos, feat.m_frame.m_rota
+                rPcam = lPcam + np.linalg.inv(lRcam) @ rPc
+                rRcam = lRcam.copy()
+
+                luv = np.array((feat.m_pos))
+                ruv = np.array((feat.m_pos))
+                ruv[0, 0] = ruv[0, 0] - luv[2, 0]
+
+                lxyz = self.m_camera.lift(luv)
+                lxyz = lxyz / lxyz[2, 0]
+                rxyz = self.m_camera.lift(ruv)
+                rxyz = rxyz / rxyz[2, 0]
+
+                J, l = np.zeros((4, 3)), np.zeros((4, 1))
+                J[0, :] = -lRcam[1, :] + lxyz[1, 0] * lRcam[2, :]
+                J[1, :] =  lRcam[0, :] - lxyz[0, 0] * lRcam[2, :]
+                J[2, :] = -rRcam[1, :] + rxyz[1, 0] * rRcam[2, :]
+                J[3, :] =  rRcam[0, :] - rxyz[0, 0] * rRcam[2, :]
+
+                l[:2, :] = J[:2, :] @ (Pj - lPcam)
+                l[2:, :] = J[2:, :] @ (Pj - rPcam)
+
+                N += J.transpose() @ J
+                b += J.transpose() @ l
+            dx = np.linalg.inv(N) @ b
+            Pj = Pj - dx
+        
+        for feat in feats:
+            feat = feats[0]
+            lPcam, lRcam = feat.m_frame.m_pos, feat.m_frame.m_rota
+            pcam = lRcam @ (Pj - lPcam)
+            if (pcam[2, 0] <= 0):
+                return False
+            if (pcam[2, 0] >=200):
+                return False
+        
+        point.m_pos = Pj
+        return True
 
 
 

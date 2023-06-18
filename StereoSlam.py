@@ -10,6 +10,9 @@ from filter import *
 from coors import *
 import plotmain
 import os
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 np.seterr(all="raise")
 from scipy.spatial.transform import Rotation as R
 
@@ -22,6 +25,12 @@ class StereoSlam:
         self.m_filter = KalmanFilter()
         self.m_estimator = CLS()
         self.m_camera = None
+        self.m_fig, self.m_ax = plt.subplots()  # 创建画布和绘图区
+        self.ResultListPos = []
+        plt.ion()
+        self.m_ax.set_aspect(1)
+
+
 
     def readFrameFile(self, path_frame, path_feats):
         i_frame = 0
@@ -794,11 +803,56 @@ class StereoSlam:
                 if (self.TrackLastFrame() == False):
                     #TODO: remove the latest frame and its observations
                     pass
+                # self.showResult(frame)
+
+                self.m_map.triangulate()
                 # continue
             self.m_estimator.solveKitti(self.m_map, self.m_camera, windowsize)
+            self.removeLastFrame(windowsize)
+            FrameNumInWindow -= 1
     
-    def removeLatestFrame(self):
-        pass
+    def removeLastFrame(self, windowsize):
+        frames = self.m_map.m_frames
+        if len(frames) != windowsize:
+            return
+        
+        points = self.m_map.m_points
+        frame0 = frames[0]
+
+        for feat in frame0.m_features:
+            mappoint = feat.m_mappoint
+            if len(mappoint.m_obs) == 1:
+                del points[mappoint.m_id]
+                continue
+            mappoint.m_obs.remove(feat)
+            if mappoint.m_buse == True:
+                mappoint.m_bconstrain = True
+
+        del frames[0]
+
+        self.showResult(frame0)
+
+
+
+    def showResult(self, frame):
+        self.ResultListPos.append(frame.m_pos)
+        array = np.array(self.ResultListPos)
+        plt.clf()
+        plt.xlim(-10, 10)
+        plt.ylim(-10, 10)
+        plt.plot(array[:, 0], array[:, 2])
+
+        points = []
+        for feat in frame.m_features:
+            if feat.m_mappoint.m_buse < 1:
+                continue
+            points.append(feat.m_mappoint.m_pos.transpose())
+        
+        points = np.array(points)
+        points = points.reshape((points.shape[0], -1))
+        # plt.scatter(points[:, 0], points[:, 2])
+        plt.pause(0.001)
+
 
     def TrackLastFrame(self):
         """solve initial value for the latest frame
@@ -819,12 +873,14 @@ class StereoSlam:
         if len(usedLandmarks) < 2:
             print("used", len(usedLandmarks), "landmarks")
             return False
-        for iter in range(3):
+        for iter in range(10):
             N, b = np.zeros((ParamNum, ParamNum)), np.zeros((ParamNum, 1))
             pRwc, pPwc = nframe.m_rota, nframe.m_pos
             for i in range(len(nframe.m_features)):
                 pfeat = nframe.m_features[i]
                 if pfeat.m_mappoint not in usedLandmarks:
+                    continue
+                if pfeat.m_buse == False:
                     continue
                 PointPos = pfeat.m_mappoint.m_pos
                 PointPos_c = pRwc @ (PointPos - pPwc)
@@ -838,7 +894,7 @@ class StereoSlam:
                 Jphi = Jacobian_phai(pRwc, pPwc, PointPos, PointPos_c, fx, fy, intrin_b)
 
                 J[: 3, 0: 3] = J_cam
-                J[:3, 3: 6] = Jphi
+                J[: 3, 3: 6] = Jphi
 
                 P = P * (1 / (self.m_filter.m_PixelStd ** 2))
                 uv_obs = pfeat.m_pos
@@ -848,12 +904,19 @@ class StereoSlam:
                 b += J.transpose() @ P @ L
             # np.savetxt("./debug/N.txt", N)
             dx = np.linalg.inv(N) @ b
+            if np.linalg.norm(dx) <= 1E-2:
+                break
             nframe.m_pos = nframe.m_pos - dx[0: 3, :]
             nframe.m_rota = nframe.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[3: 6, :]))
+            self.removeOutlier(usedLandmarks, nframe)
+
+        for i in range(len(nframe.m_features)):
+            nframe.m_features[i].m_buse = True
         self.ProjectLandmarks(nframe)
+
         return True
     
-    def removeOutlier(self, matchedframe, matchedFeature, iteration):
+    def removeOutlier(self, usedLandmarks, nframe):
         """_summary_
 
         Args:
@@ -864,45 +927,37 @@ class StereoSlam:
         Returns:
             int: number of removed landmarks
         """
-        threshold = 10
-        if iteration >= 2:
-            threshold = 3        
+        pRwc, pPwc = nframe.m_rota, nframe.m_pos
+        resi_dict = {}
+        for i in range(len(nframe.m_features)):
+            pfeat = nframe.m_features[i]
+            if pfeat.m_mappoint not in usedLandmarks:
+                continue
+            PointPos = pfeat.m_mappoint.m_pos
+            PointPos_c = pRwc @ (PointPos - pPwc)
+            pfeat.m_PosInCamera = PointPos_c.copy()
+            uv = self.m_camera.project(PointPos_c)
+
+            # PointPos_c = pfeat.m_PosInCamera
+            uv_obs = pfeat.m_pos
+            resi_dict[i] = np.linalg.norm(uv - uv_obs)
+        resi_dict = dict(sorted(resi_dict.items(), key=lambda x: x[1]))
+
+        down = int(len(resi_dict) * 0.25)
+        up = int(len(resi_dict) * 0.75)
         
-        pfeatures, nfeatures = matchedFeature[0], matchedFeature[1]
-        pframe, nframe = matchedframe[0], matchedframe[1]
-        pRwc, pPwc = pframe.m_rota, pframe.m_pos
-        nRwc, nPwc = nframe.m_rota, nframe.m_pos
+        k = 1.5
+        keys, values = list(resi_dict.keys()), list(resi_dict.values())
+        normal_range = values[up] - values[down]
+        outlier_up = values[up] + k * normal_range
+        # outlier_down = down - k * normal_range
 
-        numRemove, featureNum = 0, len(pfeatures)
-        i = 0
-        while i < featureNum:
-            PointPos = pfeatures[i].m_mappoint.m_pos
-            pPointPos_c = pRwc @ (PointPos - pPwc)
-            puv = self.m_camera.project(pPointPos_c)
-            puv_obs = pfeatures[i].m_pos
+        for i in range(up, len(keys)):
+            key = keys[i]
+            if resi_dict[key] >= outlier_up:
+                nframe.m_features[key].m_buse = False
 
-            nPointPos_c = nRwc @ (PointPos - nPwc)
-            nuv = self.m_camera.project(nPointPos_c)
-            nuv_obs = nfeatures[i].m_pos
 
-            nremoved, premoved = False, False
-            if np.linalg.norm(puv - puv_obs, 2) > threshold:
-                premoved = True
-                pfeatures[i].m_buse = False
-            if np.linalg.norm(nuv - nuv_obs, 2) > threshold:
-                nremoved = True
-                nfeatures[i].m_buse = False
-            
-            if (pfeatures[i].m_buse == False and nfeatures[i].m_buse == False) or pPointPos_c[2, 0] <= 0 or nPointPos_c[2, 0] <= 0:
-                pfeatures[i].m_mappoint.m_buse = False
-                del pfeatures[i]
-                del nfeatures[i]
-                numRemove += 1
-                i -= 1
-            featureNum = len(pfeatures)
-            i += 1
-
-        return numRemove
 
     def ProjectLandmarks(self, frame):
         for feat in frame.m_features:
