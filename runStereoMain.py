@@ -6,7 +6,7 @@ import numpy as np
 import sys
 #%%  initialization files
 sys.setrecursionlimit(3000)
-path_to_simu = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/data/"
+path_to_simu = "/media/xuzhuo/T7/01-data/07-kitti/00/Features/"
 path_to_point = glob.glob(path_to_simu + "*.pc.noise")[0]
 path_to_frame = glob.glob(path_to_simu + "*.fm.noise")[0]
 path_to_feats = glob.glob(path_to_simu + "*.txt")

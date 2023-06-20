@@ -33,6 +33,14 @@ class Frame:
         dup.m_features = copy.deepcopy(self.m_features, memo)
         dup.m_time = self.m_time
         return dup
+    
+    def check(self):
+        valid = 0
+        for feat in self.m_features:
+            if feat.m_buse and feat.m_mappoint.m_buse == 1:
+                valid += 1
+        
+        return valid
 
 class Feature:
     def __init__(self, pos = np.zeros([3, 1]), du = 0, mapPointId = -1):
@@ -82,6 +90,16 @@ class MapPoint:
         dup.m_obs = copy.deepcopy(self.m_obs, memo)
         return dup
 
+    def check(self):
+        valid = 0
+        for obs in self.m_obs:
+            if obs.m_buse == True:
+                valid += 1
+        
+        if valid < 2:
+            self.m_buse = 0
+        else:
+            self.m_buse = 1
 
 class Map:
     def __init__(self):
@@ -154,13 +172,12 @@ class Map:
         for id, point in self.m_points.items():
             if point.m_buse == -1:
                 continue
-            if len(point.m_obs) < 2 and point.m_bconstrain == False:
+            if len(point.m_obs) < 2: # or point.m_bconstrain == False:
                 self.m_points[id].m_buse = 0
             else:
                 self.m_points[id].m_buse = 1
                 useful += 1
-        
-        return useful
+            # point.check()
 
     def TriangulateByStereo(self, feature):
         """Solve points in camera frame(left)
@@ -268,7 +285,7 @@ class Map:
             pcam = lRcam @ (Pj - lPcam)
             if (pcam[2, 0] <= 0):
                 return False
-            if (pcam[2, 0] >=200):
+            if (pcam[2, 0] >= 300):
                 return False
         
         point.m_pos = Pj
@@ -374,3 +391,21 @@ def Jacobian_ppoint(fx, fy, b, xyz):
     Jpoint[2, 2] = - b / z / z
 
     return Jpoint
+
+def robustKernelHuber(residual, thres):
+    if np.any(residual < 1E-4):
+        return np.array([1, 1, 1])
+    
+    P = []
+    for i in range(residual.shape[0]):
+        w =  Huber(residual[i], thres) / np.linalg.norm(residual[i], 2)
+        P.append(w)
+    return np.array(P)
+
+def Huber(residual, thres):
+    if np.all(np.abs(residual) < thres):
+        return np.abs(residual)
+    else:
+        return np.sqrt(2 * thres * np.abs(residual) - thres ** 2)
+
+    

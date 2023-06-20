@@ -791,7 +791,7 @@ class StereoSlam:
             self.m_map.check()
 
 
-    def runKittiVIO_CLSMarg(self, path_to_output, path_gt, windowsize=20, iteration=1):
+    def runKittiVIO_CLSMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):
         self.m_map.m_points.clear()
 
         FrameNumInWindow = 0
@@ -804,12 +804,20 @@ class StereoSlam:
                     #TODO: remove the latest frame and its observations
                     pass
                 # self.showResult(frame)
-
                 self.m_map.triangulate()
-                # continue
-            self.m_estimator.solveKitti(self.m_map, self.m_camera, windowsize)
-            self.removeLastFrame(windowsize)
-            FrameNumInWindow -= 1
+                if self.m_estimator.solveKitti(self.m_map, self.m_camera, windowsize) == -1:
+                    self.removeNewFrame()
+                    FrameNumInWindow -= 1
+            if FrameNumInWindow >= windowsize:
+                self.removeLastFrame(windowsize)
+                FrameNumInWindow -= 1
+        
+        plt.figure(3)
+        array = np.array(self.ResultListPos)
+        # plt.xlim(-10, 10)
+        # plt.ylim(-10, 10)
+        plt.plot(array[:, 0], array[:, 2])
+        plt.show()
     
     def removeLastFrame(self, windowsize):
         frames = self.m_map.m_frames
@@ -825,12 +833,30 @@ class StereoSlam:
                 del points[mappoint.m_id]
                 continue
             mappoint.m_obs.remove(feat)
-            if mappoint.m_buse == True:
+
+            if len(mappoint.m_obs) < 2:
+                mappoint.m_buse = 0
+
+            if mappoint.m_buse == 1:
                 mappoint.m_bconstrain = True
 
-        del frames[0]
+        del self.m_map.m_frames[0]
 
         self.showResult(frame0)
+    
+    def removeNewFrame(self):
+        frames = self.m_map.m_frames
+        points = self.m_map.m_points
+        position = len(frames) - 1
+
+        for feat in frames[position].m_features:
+            mappoint = feat.m_mappoint
+            if len(mappoint.m_obs) == 1:
+                del points[mappoint.m_id]
+                continue
+            mappoint.m_obs.remove(feat)
+        del self.m_map.m_frames[position]
+
 
 
 

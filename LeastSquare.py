@@ -154,6 +154,7 @@ class CLS:
     def __addFeaturesKitti(self, features):
         for feat in features:
             mappoint = feat.m_mappoint
+            mappoint.check()
             if mappoint.m_buse < 1:
                 continue
             mappointID = mappoint.m_id
@@ -565,7 +566,8 @@ class CLS:
         SaveFrames = None
 
         prevstate = None
-        for iter in range(10):
+        iter = 0
+        while iter < 20:
             # 1. search for observations and landmarks
             self.m_MapPoints = {}
             self.m_MapPoints_Point = {}
@@ -600,9 +602,10 @@ class CLS:
                 tec, Rec = frame.m_pos, frame.m_rota
                 features = frame.m_features
                 
-                J, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
+                J, P_obs, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
                 obsnum = l.shape[0]
-                P_obs = np.identity(l.shape[0]) * (1.0 / (self.m_PixelStd ** 2))
+                if obsnum <= 9:
+                    return -1
                 N += J.transpose() @ P_obs @ J
                 b += J.transpose() @ P_obs @ l
                 TotalObsNum += obsnum
@@ -612,8 +615,10 @@ class CLS:
 
             if len(self.m_LandmarkLocal) == 0:
                 N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000
-            np.savetxt("./debug/N.txt", N)
-            state = np.linalg.inv(N ) @ (b )
+            else:
+                np.savetxt("./debug/NPrior.txt", NPrior)
+                np.savetxt("./debug/N.txt", N)
+            state = np.linalg.inv(N + NPrior) @ (b + bPrior)
             StateFrame = state[: windowsize_tmp * 6]
 
             for j in range(windowsize_tmp):  
@@ -624,15 +629,18 @@ class CLS:
                 position = self.m_MapPoints[id_]
                 self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
             # self.check(map, camera)
-            
-            if self.removeOutlier(map, camera) and np.max([np.max(state), np.fabs(np.min(state))]) > 50:
+            if self.removeOutlier(map, camera):
                 self.loadstates(frames, self.m_MapPoints_Point)
-
+                prevstate = state
+                # if iter > 0:
+                iter -= 1
+                continue
 
             if iter >= 1 and np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2) < 1E-2:
                 break
             if iter != 9:
                 prevstate = state
+            iter += 1
         print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
         if windowsize_tmp == windowsize:
             self.marginalization(N, b, windowsize_tmp)
@@ -648,7 +656,7 @@ class CLS:
             for obs in point.m_obs:
                 obs.m_buse = True
         
-        return frames
+        return 1
 
     def savestates(self, frames, mappoints):
         self.m_save_frames = copy.deepcopy(frames)
@@ -682,19 +690,51 @@ class CLS:
                 resi_dict[feat] = np.linalg.norm(uv - feat.m_pos, 2)
         resi_dict = dict(sorted(resi_dict.items(), key=lambda x: x[1]))
 
-        down = int(len(resi_dict) * 0.25)
-        up = int(len(resi_dict) * 0.75)
+        # chi2 test for outlier remove
+        thres = 5.991
+        iter, inlier, outlier = 0, 0, 0
+        while iter < 5:
+            for key, value in resi_dict.items():
+                if value > thres:
+                    outlier += 1
+                else:
+                    inlier += 1
+            
+            if float(inlier) / (outlier + inlier) > 0.5:
+                break
+            else:
+                thres *= 2
+                iter += 1
         
-        k = 1.5
-        keys, values = list(resi_dict.keys()), list(resi_dict.values())
-        normal_range = values[up] - values[down]
-        outlier_up = values[up] + k * normal_range
-
         bOutlier = False
-        for i in range(up, len(keys)):
-            if resi_dict[keys[i]] >= outlier_up:
+        keys, values = list(resi_dict.keys()), list(resi_dict.values())
+        for i in range(len(keys)):
+            if resi_dict[keys[i]] >= thres:
                 keys[i].m_buse = False
+                if keys[i].m_frame.check() < 4:
+                    for feat in keys[i].m_frame.m_features:
+                        if resi_dict[keys[i]] >= 3 * thres:
+                            feat.m_buse = False
+                            continue
+                        feat.m_buse = True
+                    continue
                 bOutlier = True
+        
+
+
+
+        # down = int(len(resi_dict) * 0.25)
+        # up = int(len(resi_dict) * 0.75)
+        
+        # k = 1.5
+        # normal_range = values[up] - values[down]
+        # outlier_up = values[up] + k * normal_range
+
+        # bOutlier = False
+        # for i in range(up, len(keys)):
+        #     if resi_dict[keys[i]] >= outlier_up:
+        #         keys[i].m_buse = False
+        #         bOutlier = True
 
         mappoints = map.m_points
         for id, point in mappoints.items():
@@ -704,15 +744,19 @@ class CLS:
             for obs in point.m_obs:
                 tc, Rc = obs.m_frame.m_pos, obs.m_frame.m_rota
                 point_cam = Rc @ (point.m_pos - tc)
-                if point_cam[2, 0] < 0 or point_cam[2, 0] >= 200:
+                if point_cam[2, 0] < 0:
                     point.m_buse = -1
-            count = 0
-            for obs in point.m_obs:
-                if obs.m_buse == False:
-                    count += 1
-            
-            if count == len(point.m_obs):
-                point.m_buse = 0
+
+            point.check()
+
+        for frame in frames:
+            countl, countf = 0, 0
+            for feat in frame.m_features:
+                if feat.m_mappoint.m_buse == 1:
+                    countl += 1
+                if feat.m_buse:
+                    countf += 1
+            print("frame", frame.m_id, " used", countl, "landmarks,", countf, "features")
         return bOutlier
 
     def check(self, map, camera):
@@ -905,6 +949,7 @@ class CLS:
         statenum = windowsize * 6 + len(self.m_MapPoints) * 3
         obsnum = 0
         FrameStateNum = windowsize * 6
+        thres = sqrt(5.991)
 
         for feat in features:
             mappoint = feat.m_mappoint
@@ -919,8 +964,8 @@ class CLS:
         #     mappoint = feat.m_mappoint
         #     if mappoint.m_buse >= 1:
         #         obsnum += 1
-
-        J, l = np.zeros((obsnum * 3, statenum)), np.zeros((obsnum * 3, 1))
+        obsnum *= 3
+        J, l, P = np.zeros((obsnum, statenum)), np.zeros((obsnum, 1)), np.zeros((obsnum, obsnum))
         fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
 
         row = 0
@@ -938,10 +983,12 @@ class CLS:
             uv = camera.project(pointPos_c)
             uv_obs = feat.m_pos
             PointIndex = self.m_MapPoints[pointID]
-            
             l_sub = uv - uv_obs
             l[row * 3: row * 3 + 3, :] = l_sub
-            test = np.linalg.norm(l_sub, 2)
+
+            P_sub = robustKernelHuber(l_sub, thres)
+            P_sub = np.diag(P_sub.flatten())
+            P[row * 3: row * 3 + 3, row * 3: row * 3 + 3] = P_sub @ np.identity(3) * (1.0 / (self.m_PixelStd ** 2))
 
             Jphi = Jacobian_phai(Rec, tec, pointPos, pointPos_c, fx, fy, b)
             Jrcam = Jacobian_rcam(Rec, pointPos_c, fx, fy, b)
@@ -952,4 +999,4 @@ class CLS:
             J[row * 3: row * 3 + 3, FrameStateNum + PointIndex : FrameStateNum + PointIndex + 3] = JPoint
             row += 1
 
-        return J, l
+        return J, P, l
