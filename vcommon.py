@@ -5,6 +5,7 @@ import numpy as np
 import math
 import copy
 from camera import *
+from scipy.linalg import fractional_matrix_power
 
 
 PI = math.pi
@@ -41,6 +42,14 @@ class Frame:
                 valid += 1
         
         return valid
+    
+    def reset(self):
+        self.m_pos = np.zeros((3, 1))
+        self.m_rota = np.identity(3)
+
+        for feat in self.m_features:
+            feat.m_buse = True
+            feat.m_mappoint.m_buse = True
 
 class Feature:
     def __init__(self, pos = np.zeros([3, 1]), du = 0, mapPointId = -1):
@@ -117,6 +126,17 @@ class Map:
         mappoint = MapPoint(np.array([[x], [y], [z]]), id)
         return mappoint
 
+    def clear(self):
+        for id, point in self.m_points.items():
+            point.m_buse = 1
+        
+        for frame in self.m_frames:
+            for feat in frame.m_features:
+                feat.m_buse = True
+        # self.m_points.clear()
+        # self.m_frames.copy()
+        self.m_bFirstFrame = True
+
 
     def readMapFile(self, path):
         with open(path, "r") as f:
@@ -131,7 +151,7 @@ class Map:
                 else:
                     break
     
-    def addNewFrame(self, frame):
+    def addNewFrame(self, frame, gmap=None):
         # 1. add frames
         self.m_frames.append(frame)
 
@@ -148,7 +168,9 @@ class Map:
 
             self.m_points[pointID].m_obs.append(feat)
             feat.m_mappoint = self.m_points[pointID]
-
+            if gmap is not None and pointID in gmap.m_points.keys():
+                self.m_points[pointID].m_pos = gmap.m_points[pointID].m_pos.copy()
+                continue
             # triangulate points in camera frame
             if feat.m_btriangulate == False:
                 # points in world frame equals to points in 
@@ -161,7 +183,7 @@ class Map:
                     count += 1
                     if self.m_bFirstFrame:
                         self.m_points[pointID].m_pos = feat.m_PosInCamera
-        print("frame ID: ", frame.m_time, " ", count, " landmarks triangulated,", newpoint, "new found")
+        # print("frame ID: ", frame.m_time, " ", count, " landmarks triangulated,", newpoint, "new found")
         if len(self.m_frames) >= 2:
             self.check()
 
@@ -185,6 +207,8 @@ class Map:
         Args:
             feature (ndarray): vcommon.Feature object
         """
+        id = feature.m_id
+        
         # baseline: from left to right camera
         baseline = self.m_camera.getBaseline()
         rPc = np.array([[baseline], [0], [0]])
@@ -408,4 +432,6 @@ def Huber(residual, thres):
     else:
         return np.sqrt(2 * thres * np.abs(residual) - thres ** 2)
 
-    
+
+def UnitRotation(R):
+    return R @ fractional_matrix_power((R.transpose() @ R), -0.5)

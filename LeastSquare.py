@@ -17,6 +17,15 @@ class CLS:
         self.m_Nmarg = 0
         self.m_bmarg = 0
         self.m_LandmarkLocal = {}
+    
+    def reset(self):
+        self.m_MapPoints = {}       # position of mappoint in state vector
+        self.m_MapPointPos = 0      # [cameraPos CameraRotation point1 ... pointN]
+        self.m_MapPoints_Point = {}
+        self.m_estimateFrame = []
+        self.m_Nmarg = 0
+        self.m_bmarg = 0
+        self.m_LandmarkLocal = {}
 
     def solveAll(self, frames, camera, frames_gt, maxtime = -1, iteration = 1):
         obsnum, statenum = 0, 0
@@ -606,6 +615,7 @@ class CLS:
                 obsnum = l.shape[0]
                 if obsnum <= 9:
                     return -1
+                print(obsnum)
                 N += J.transpose() @ P_obs @ J
                 b += J.transpose() @ P_obs @ l
                 TotalObsNum += obsnum
@@ -613,17 +623,19 @@ class CLS:
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
             NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
 
-            if len(self.m_LandmarkLocal) == 0:
+            if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
                 N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000
-            else:
-                np.savetxt("./debug/NPrior.txt", NPrior)
-                np.savetxt("./debug/N.txt", N)
-            state = np.linalg.inv(N + NPrior) @ (b + bPrior)
+            # else:
+            #     np.savetxt("./debug/NPrior.txt", NPrior)
+            #     np.savetxt("./debug/N.txt", N)
+            state = np.linalg.inv(N + NPrior + np.identity(N.shape[0]) * 1E-8) @ (b + bPrior)
             StateFrame = state[: windowsize_tmp * 6]
 
             for j in range(windowsize_tmp):  
                 frames[j].m_pos =  frames[j].m_pos - state[j * 6: j * 6 + 3, :]
                 frames[j].m_rota = frames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                frames[j].m_rota = UnitRotation(frames[j].m_rota)
+
             StateFrameNum = windowsize_tmp * 6
             for id_ in self.m_MapPoints.keys():
                 position = self.m_MapPoints[id_]
@@ -668,7 +680,7 @@ class CLS:
             frames[i].m_rota = self.m_save_frames[i].m_rota.copy()
         
         for key, value in mappoints.items():
-            value.m_pos = self.m_save_mappoints[key].m_pos
+            value.m_pos = self.m_save_mappoints[key].m_pos.copy()
             
 
     def removeOutlier(self, map, camera):
@@ -691,7 +703,7 @@ class CLS:
         resi_dict = dict(sorted(resi_dict.items(), key=lambda x: x[1]))
 
         # chi2 test for outlier remove
-        thres = 5.991
+        thres = 7.991
         iter, inlier, outlier = 0, 0, 0
         while iter < 5:
             for key, value in resi_dict.items():
@@ -747,11 +759,12 @@ class CLS:
                 if point_cam[2, 0] < 0:
                     point.m_buse = -1
 
-            point.check()
+            # point.check()
 
         for frame in frames:
             countl, countf = 0, 0
             for feat in frame.m_features:
+                feat.m_mappoint.check()
                 if feat.m_mappoint.m_buse == 1:
                     countl += 1
                 if feat.m_buse:
@@ -840,7 +853,7 @@ class CLS:
         self.m_Nmarg = N_marg
         self.m_bmarg = b_marg
         self.m_LandmarkLocal = LandmarkLocal
-        np.savetxt("./debug/Nmarg.txt", self.m_Nmarg)
+        # np.savetxt("./debug/Nmarg.txt", self.m_Nmarg)
 
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/N_sub.txt", N_sub)
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/N.txt", N)
@@ -949,7 +962,7 @@ class CLS:
         statenum = windowsize * 6 + len(self.m_MapPoints) * 3
         obsnum = 0
         FrameStateNum = windowsize * 6
-        thres = sqrt(5.991)
+        thres = 5.991
 
         for feat in features:
             mappoint = feat.m_mappoint

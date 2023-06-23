@@ -13,7 +13,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-np.seterr(all="raise")
+# np.seterr(all="raise")
 from scipy.spatial.transform import Rotation as R
 
 
@@ -22,6 +22,7 @@ class StereoSlam:
     def __init__(self):
         self.m_frames = []
         self.m_map = Map()
+        self.m_GlobMap = Map()
         self.m_filter = KalmanFilter()
         self.m_estimator = CLS()
         self.m_camera = None
@@ -63,6 +64,24 @@ class StereoSlam:
 
             with open(path_feat, "r") as f:
                 features, sow = self.__parseFeatureFileKitti(path_feat)
+                frame.m_features = features
+                frame.m_time = sow
+                frame.m_id = sow
+                for feat in features:
+                    feat.m_frame = frame
+            self.m_frames.append(frame)
+
+    def readFeatureFileXyz(self, path_features):
+        for path_feat in path_features:
+            frame = Frame()
+            # time = os.path.basename(path_feat)
+            # time = time[: len(time) - 4]
+
+            # frame.m_id = time
+            # frame.m_time = time
+
+            with open(path_feat, "r") as f:
+                features, sow = self.__parseFeatureFileKittixyz(path_feat)
                 frame.m_features = features
                 frame.m_time = sow
                 frame.m_id = sow
@@ -170,11 +189,27 @@ class StereoSlam:
                     break
         return features, sow
 
+    def __parseFeatureFileKittixyz(self, feature_file):
+        i_line = 0
+        features = []
+        with open(feature_file) as f:
+            while True:
+                line = f.readline()
+                if i_line == 0:
+                    items = line.split()
+                    id, sow = int(items[0]), float(items[1])
+                    i_line += 1
+                    continue
+                if line:
+                    features.append(self.__parseFeatureLinexyz(line))
+                else: 
+                    break
+        return features, sow
 
     def __parseFeatureLine(self, line = str()):
         items = line.split()
 
-        MappointId, u, v, du = int(items[0]), float(items[1]), float(items[2]), float(items[3])
+        MappointId, u, v, du, sigma = int(items[0]), float(items[1]), float(items[2]), float(items[3]), float(items[4])
         feature = Feature(np.array([[u], [v], [du]]), du, MappointId)
 
         if MappointId not in self.m_map.m_points.keys():
@@ -189,6 +224,28 @@ class StereoSlam:
         feature.m_mappoint = mappoint
         mappoint.m_obs.append(feature)
         return feature
+
+    def __parseFeatureLinexyz(self, line = str()):
+        items = line.split()
+
+        MappointId, u, v, du, x, y, z, sigma = int(items[0]), float(items[1]), float(items[2]), float(items[3]), float(items[4]), float(items[5]), float(items[6]), float(items[7])
+        feature = Feature(np.array([[u], [v], [du]]), du, MappointId)
+
+        if MappointId not in self.m_GlobMap.m_points.keys():
+            mappoint = MapPoint()
+            mappoint.m_id = MappointId
+            mappoint.m_obs.append(feature)
+            mappoint.m_pos = np.array([[x], [y], [z]])
+            self.m_GlobMap.m_points[MappointId] = mappoint
+
+            feature.m_mappoint = mappoint
+            return feature
+        
+        mappoint = self.m_GlobMap.m_points[MappointId]
+        feature.m_mappoint = mappoint
+        mappoint.m_obs.append(feature)
+        return feature
+
 
     def runVIO(self, mode = 0, path_to_output = "./", frames_gt=[], frames_linear=[], maxtime=-1, bNoiseData = False, iteration = 1, windowsize=20):
         """Run VIO for an epoch
@@ -795,29 +852,64 @@ class StereoSlam:
         self.m_map.m_points.clear()
 
         FrameNumInWindow = 0
+        self.m_lframe = None
         for frame in self.m_frames:
             # 1. find correspondences
             if FrameNumInWindow < windowsize:
-                self.m_map.addNewFrame(frame)
+                self.m_map.addNewFrame(frame, self.m_GlobMap)
                 FrameNumInWindow += 1
                 if (self.TrackLastFrame() == False):
                     #TODO: remove the latest frame and its observations
-                    pass
-                # self.showResult(frame)
-                self.m_map.triangulate()
-                if self.m_estimator.solveKitti(self.m_map, self.m_camera, windowsize) == -1:
                     self.removeNewFrame()
+                    frame.reset()
+                    self.m_estimator.reset()
+                    self.m_map.clear()
+                    # self.m_map.addNewFrame(frame, self.m_GlobMap)
+                    # self.TrackLastFrame()
                     FrameNumInWindow -= 1
+                    continue
+            if FrameNumInWindow < windowsize:
+                self.m_lframe = frame
+                # self.showResult(frame)
+                # self.m_map.triangulate()
+            
+            if FrameNumInWindow != windowsize:
+                continue
+            if self.m_estimator.solveKitti(self.m_map, self.m_camera, windowsize) == -1:
+                # clear all frames
+                # self.removeNewFrame()
+                frame.reset()
+                self.m_estimator.reset()
+                self.m_map.clear()
+                # self.m_map.addNewFrame(frame, self.m_GlobMap)
+                if self.TrackLastFrame() == False:
+                    self.removeNewFrame()
+                    self.m_map.clear()
+                    FrameNumInWindow -= 1
+                    continue
+                # FrameNumInWindow = 1
             if FrameNumInWindow >= windowsize:
                 self.removeLastFrame(windowsize)
                 FrameNumInWindow -= 1
+            self.m_lframe = frame
         
+        plt.ioff()
         plt.figure(3)
         array = np.array(self.ResultListPos)
+        # np.savetxt("./log/kitti_07_CLSMarg.txt", array)
         # plt.xlim(-10, 10)
         # plt.ylim(-10, 10)
         plt.plot(array[:, 0], array[:, 2])
         plt.show()
+
+        with open("./log/kitti_07_CLSMarg.txt", "a") as f:
+            for frame in self.m_frames:
+                twc, Rwc = frame.m_pos, frame.m_rota
+                att = rot2att(Rwc) * R2D
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n".format(frame.m_time, twc[0, 0], twc[1, 0], twc[2, 0], att[0], att[1], att[2]))
+
+
+
     
     def removeLastFrame(self, windowsize):
         frames = self.m_map.m_frames
@@ -864,18 +956,18 @@ class StereoSlam:
         self.ResultListPos.append(frame.m_pos)
         array = np.array(self.ResultListPos)
         plt.clf()
-        plt.xlim(-10, 10)
-        plt.ylim(-10, 10)
+        # plt.xlim(-10, 10)
+        # plt.ylim(-10, 10)
         plt.plot(array[:, 0], array[:, 2])
 
-        points = []
-        for feat in frame.m_features:
-            if feat.m_mappoint.m_buse < 1:
-                continue
-            points.append(feat.m_mappoint.m_pos.transpose())
+        # points = []
+        # for feat in frame.m_features:
+        #     if feat.m_mappoint.m_buse < 1:
+        #         continue
+        #     points.append(feat.m_mappoint.m_pos.transpose())
         
-        points = np.array(points)
-        points = points.reshape((points.shape[0], -1))
+        # points = np.array(points)
+        # points = points.reshape((points.shape[0], -1))
         # plt.scatter(points[:, 0], points[:, 2])
         plt.pause(0.001)
 
@@ -885,8 +977,8 @@ class StereoSlam:
         """
 
         FrameNum = len(self.m_map.m_frames)
-        if FrameNum <= 1:
-            return
+        # if FrameNum <= 1:
+        #     return True
         nframe = self.m_map.m_frames[FrameNum - 1]
         usedLandmarks = self.findCorrespond(nframe)
 
@@ -899,9 +991,12 @@ class StereoSlam:
         if len(usedLandmarks) < 2:
             print("used", len(usedLandmarks), "landmarks")
             return False
+        if self.m_lframe is not None:
+            nframe.m_rota, nframe.m_pos = self.m_lframe.m_rota.copy(), self.m_lframe.m_pos.copy()
         for iter in range(10):
             N, b = np.zeros((ParamNum, ParamNum)), np.zeros((ParamNum, 1))
             pRwc, pPwc = nframe.m_rota, nframe.m_pos
+            pRwc_copy, pPwc_copy = nframe.m_rota.copy(), nframe.m_pos.copy()
             for i in range(len(nframe.m_features)):
                 pfeat = nframe.m_features[i]
                 if pfeat.m_mappoint not in usedLandmarks:
@@ -918,27 +1013,35 @@ class StereoSlam:
                 
                 J_cam = Jacobian_rcam(pRwc, PointPos_c, fx, fy, intrin_b)
                 Jphi = Jacobian_phai(pRwc, pPwc, PointPos, PointPos_c, fx, fy, intrin_b)
+                P_sub = robustKernelHuber(L, np.sqrt(5.991))
+                P_sub = np.diag(P_sub.flatten())
+                uv_obs = pfeat.m_pos
 
                 J[: 3, 0: 3] = J_cam
                 J[: 3, 3: 6] = Jphi
-
-                P = P * (1 / (self.m_filter.m_PixelStd ** 2))
-                uv_obs = pfeat.m_pos
                 L[:] = uv - uv_obs
+
+                P = P_sub @ P * (1 / (self.m_filter.m_PixelStd ** 2))
 
                 N += J.transpose() @ P @ J
                 b += J.transpose() @ P @ L
             # np.savetxt("./debug/N.txt", N)
-            dx = np.linalg.inv(N) @ b
+            try:
+                dx = np.linalg.inv(N) @ b
+            except Exception:
+                return False
             if np.linalg.norm(dx) <= 1E-2:
                 break
             nframe.m_pos = nframe.m_pos - dx[0: 3, :]
             nframe.m_rota = nframe.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[3: 6, :]))
-            self.removeOutlier(usedLandmarks, nframe)
+            nframe.m_rota = UnitRotation(nframe.m_rota)
+            if self.removeOutlier(usedLandmarks, nframe):
+                nframe.m_pos = pPwc_copy.copy()
+                nframe.m_rota = pRwc_copy.copy()
 
         for i in range(len(nframe.m_features)):
             nframe.m_features[i].m_buse = True
-        self.ProjectLandmarks(nframe)
+        # self.ProjectLandmarks(nframe)
 
         return True
     
@@ -959,6 +1062,8 @@ class StereoSlam:
             pfeat = nframe.m_features[i]
             if pfeat.m_mappoint not in usedLandmarks:
                 continue
+            if pfeat.m_buse == False:
+                continue
             PointPos = pfeat.m_mappoint.m_pos
             PointPos_c = pRwc @ (PointPos - pPwc)
             pfeat.m_PosInCamera = PointPos_c.copy()
@@ -966,22 +1071,53 @@ class StereoSlam:
 
             # PointPos_c = pfeat.m_PosInCamera
             uv_obs = pfeat.m_pos
-            resi_dict[i] = np.linalg.norm(uv - uv_obs)
+            resi_dict[pfeat] = np.linalg.norm(uv - uv_obs)
         resi_dict = dict(sorted(resi_dict.items(), key=lambda x: x[1]))
 
-        down = int(len(resi_dict) * 0.25)
-        up = int(len(resi_dict) * 0.75)
+        # down = int(len(resi_dict) * 0.25)
+        # up = int(len(resi_dict) * 0.75)
         
-        k = 1.5
-        keys, values = list(resi_dict.keys()), list(resi_dict.values())
-        normal_range = values[up] - values[down]
-        outlier_up = values[up] + k * normal_range
-        # outlier_down = down - k * normal_range
+        # k = 1.5
+        # keys, values = list(resi_dict.keys()), list(resi_dict.values())
+        # normal_range = values[up] - values[down]
+        # outlier_up = values[up] + k * normal_range
+        # # outlier_down = down - k * normal_range
 
-        for i in range(up, len(keys)):
-            key = keys[i]
-            if resi_dict[key] >= outlier_up:
-                nframe.m_features[key].m_buse = False
+        # for i in range(up, len(keys)):
+        #     key = keys[i]
+        #     if resi_dict[key] >= outlier_up:
+        #         nframe.m_features[key].m_buse = False
+
+        thres = 5.991
+        iter = 0
+        while iter < 5:
+            inlier, outlier = 0, 0
+            for key, value in resi_dict.items():
+                if value > thres:
+                    outlier += 1
+                else:
+                    inlier += 1
+            
+            if float(inlier) / (outlier + inlier) > 0.5:
+                break
+            else:
+                thres *= 2
+                iter += 1
+        
+        bOutlier = False
+        keys, values = list(resi_dict.keys()), list(resi_dict.values())
+        for i in range(len(keys)):
+            if resi_dict[keys[i]] >= thres:
+                keys[i].m_buse = False
+                if keys[i].m_frame.check() < 4:
+                    for feat in keys[i].m_frame.m_features:
+                        if resi_dict[keys[i]] >= 3 * thres:
+                            feat.m_buse = False
+                            continue
+                        feat.m_buse = True
+                    continue
+                bOutlier = True
+        return bOutlier
 
 
 
@@ -1025,6 +1161,8 @@ class StereoSlam:
                 continue
             if np.linalg.norm(mappoint.m_pos, 2) == 0:
                 continue
+            # if len(mappoint.m_obs) < 2:
+            #     continue
             usedLandmarks.append(mappoint)
         
         return usedLandmarks

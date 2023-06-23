@@ -26,12 +26,12 @@ class Camera:
         if (np.isnan(xyz[0, 0]) or np.isnan(xyz[1, 0]) or np.isnan(xyz[2, 0])):
             print("invalid")
         if self.m_type == CameraType().STEREO:
-            uv[0, 0] = self.m_fx * xyz[0, 0] / xyz[2, 0] + self.m_cx
-            uv[1, 0] = self.m_fy * xyz[1, 0] / xyz[2, 0] + self.m_cy
+            uv[0, 0] = self.m_fx * xyz[0, 0] / (xyz[2, 0] + 1E-5) + self.m_cx
+            uv[1, 0] = self.m_fy * xyz[1, 0] / (xyz[2, 0] + 1E-5) + self.m_cy
             uv[2, 0] = self.m_b / xyz[2, 0]
         elif self.m_type == CameraType().MONO:
-            uv[0, 0] = self.m_fx * xyz[0, 0] / xyz[2, 0] + self.m_cx
-            uv[1, 0] = self.m_fy * xyz[1, 0] / xyz[2, 0] + self.m_cy
+            uv[0, 0] = self.m_fx * xyz[0, 0] / (xyz[2, 0] + 1E-5) + self.m_cx
+            uv[1, 0] = self.m_fy * xyz[1, 0] / (xyz[2, 0] + 1E-5) + self.m_cy
             uv[2, 0] = 1
 
         return uv
