@@ -624,11 +624,11 @@ class CLS:
             NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
 
             if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
-                N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000
+                N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000 # + np.identity(6) * 1E-7
             # else:
             #     np.savetxt("./debug/NPrior.txt", NPrior)
-            #     np.savetxt("./debug/N.txt", N)
-            state = np.linalg.inv(N + NPrior + np.identity(N.shape[0]) * 1E-8) @ (b + bPrior)
+            #     np.savetxt("./debug/N.txt", N) + np.identity(N.shape[0]) * 1E-7
+            state = np.linalg.inv(N + NPrior + np.identity(N.shape[0]) * 1E-7) @ (b + bPrior)
             StateFrame = state[: windowsize_tmp * 6]
 
             for j in range(windowsize_tmp):  
@@ -889,7 +889,7 @@ class CLS:
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                 bPrior[gpos: gpos + 3, : ] = self.m_bmarg[lpos: lpos + 3, :]
-        np.savetxt("./debug/NPrior.txt", NPrior)
+        # np.savetxt("./debug/NPrior.txt", NPrior)
         return NPrior, bPrior
 
 

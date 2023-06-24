@@ -834,18 +834,65 @@ class StereoSlam:
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
 
 
-    def runKittiVIO_FilterMarg(self, path_to_output, path_gt, windowsize=20, iteration=1):
+    def runKittiVIO_FilterMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):
         self.m_map.m_points.clear()
 
         FrameNumInWindow = 0
+        self.m_lframe = None
         for frame in self.m_frames:
             # 1. find correspondences
             if FrameNumInWindow < windowsize:
-                self.m_map.addNewFrame(frame)
+                self.m_map.addNewFrame(frame, self.m_GlobMap)
                 FrameNumInWindow += 1
-                self.TrackLastFrame()
+                if (self.TrackLastFrame() == False):
+                    #TODO: remove the latest frame and its observations
+                    self.removeNewFrame()
+                    frame.reset()
+                    self.m_estimator.reset()
+                    self.m_map.clear()
+                    # self.m_map.addNewFrame(frame, self.m_GlobMap)
+                    # self.TrackLastFrame()
+                    FrameNumInWindow -= 1
+                    continue
+            if FrameNumInWindow < windowsize:
+                self.m_lframe = frame
+                # self.showResult(frame)
+                # self.m_map.triangulate()
+            
+            if FrameNumInWindow != windowsize:
                 continue
-            self.m_map.check()
+            if self.m_filter.solveKitti(self.m_map, self.m_camera, windowsize) == -1:
+                # clear all frames
+                # self.removeNewFrame()
+                frame.reset()
+                self.m_estimator.reset()
+                self.m_map.clear()
+                # self.m_map.addNewFrame(frame, self.m_GlobMap)
+                if self.TrackLastFrame() == False:
+                    self.removeNewFrame()
+                    self.m_map.clear()
+                    FrameNumInWindow -= 1
+                    continue
+                # FrameNumInWindow = 1
+            if FrameNumInWindow >= windowsize:
+                self.removeLastFrame(windowsize)
+                FrameNumInWindow -= 1
+            self.m_lframe = frame
+        
+        plt.ioff()
+        plt.figure(3)
+        array = np.array(self.ResultListPos)
+        # np.savetxt("./log/kitti_07_CLSMarg.txt", array)
+        # plt.xlim(-10, 10)
+        # plt.ylim(-10, 10)
+        plt.plot(array[:, 0], array[:, 2])
+        plt.show()
+
+        with open("./log/kitti_07_FilterMarg.txt", "a") as f:
+            for frame in self.m_frames:
+                twc, Rwc = frame.m_pos, frame.m_rota
+                att = rot2att(Rwc) * R2D
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n".format(frame.m_time, twc[0, 0], twc[1, 0], twc[2, 0], att[0], att[1], att[2]))
 
 
     def runKittiVIO_CLSMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):

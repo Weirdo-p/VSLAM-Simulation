@@ -38,5 +38,5 @@ kitti_slam.m_estimator.m_PosStd = PosStd
 kitti_slam.m_estimator.m_AttStd = AttStd
 kitti_slam.m_estimator.m_PointStd = PointStd
 
-kitti_slam.runKittiVIO_CLSMarg(path_to_output, "./")
+kitti_slam.runKittiVIO_FilterMarg(path_to_output, "./")
 # %%

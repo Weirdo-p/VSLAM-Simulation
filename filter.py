@@ -852,7 +852,8 @@ class KalmanFilter:
             # print(L)
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L
-            NPrior_inv = self.m_StateCov
+            # NPrior = B.transpose() @ P @ L + np.identity(NPrior.shape[0]) * 1E-8
+            NPrior_inv = np.linalg.inv(NPrior)
         else:
             FrameStateNum = windowsize * 6
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
@@ -866,7 +867,10 @@ class KalmanFilter:
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                 bPrior[gpos: gpos + 3, : ] = self.m_bmarg[lpos: lpos + 3, :]
             
-            
+            Nmarg = self.m_Nmarg.copy()
+            # if np.all(NPrior == 0):
+            #     Nmarg[:6, :6] = self.m_Nmarg[:6, :6] + np.identity(6) * 10000000
+
             N_inv = np.linalg.inv(self.m_Nmarg)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
@@ -911,6 +915,10 @@ class KalmanFilter:
 
             for gpos, lpos in mapping.items():
                 dX[gpos: gpos + 3, :] = StateFrame[lpos: lpos + 3, :]
+
+        # if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
+        #     NPrior[:6, :6] = NPrior[:6, :6] + np.identity(6) * 10000000
+        #     NPrior_inv[:6, :6] = NPrior_inv[:6, :6] + np.identity(6) * 10000000
 
         return NPrior, bPrior, NPrior_inv, X_return, dX
         
@@ -982,8 +990,331 @@ class KalmanFilter:
 
         return J, l
 
-    def solveSW_Kitti(self, frames, camera, map, windowsize=20, iteration=1):
-        pass
+    def solveKitti(self, map, camera, windowsize=20):
+        frames = map.m_frames
+        mappoints = map.m_points
+
+        if len(frames) < 2:
+            return 
+        windowsize_tmp = len(frames)
+
+        StateFrameSize = len(frames) * 6
+        PoseCov = np.identity(6)
+        PoseCov[:3, :3] *= (self.m_PosStd ** 2)
+        PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
+
+        SaveFrames = None
+
+        prevstate = None
+        iter = 0
+        while iter < 20:
+            # 1. search for observations and landmarks
+            self.m_MapPoints = {}
+            self.m_MapPoints_Point = {}
+            self.m_MapPointPos = 0
+            nobs = 0
+            for LocalId in range(len(frames)):
+                frame = frames[LocalId]
+                # nobs += len(frame.m_features) * 3
+                obs = self.__addFeaturesKitti(frame.m_features)
+                nobs += obs * 3
+            StateLandmark = len(self.m_MapPoints) * 3
+            self.savestates(frames, self.m_MapPoints_Point)
+
+            if len(self.m_LandmarkLocal) == 0:
+                self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
+                j = 0
+                while True:
+                    self.m_StateCov[j: j + 6, j: j + 6] = PoseCov
+                    j += 6
+
+                    if j >= StateFrameSize:
+                        break
+                self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+                tmp = (windowsize_tmp - 1) * 6
+                self.m_StateCov[tmp: StateFrameSize, tmp:StateFrameSize] = PoseCov
+            # 1. solve CLS problem by marginalizing landmark
+            AllStateNum = windowsize_tmp * 6 + StateLandmark
+
+            TotalObsNum = 0
+            N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
+            R = np.zeros((nobs, nobs))
+            B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
+            StateFrame = np.zeros((windowsize_tmp * 6, 1))
+
+            NPrior, bPrior, NPrior_inv, XPrior, dX = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
+            NPrior_inv = NPrior + np.identity(NPrior.shape[0]) * 1E-7
+            
+            if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
+                NPrior_inv[:6, :6] = NPrior_inv[:6, :6] + np.identity(6) * 1E7
+                # TotalObsNum = 6
+                # R = np.zeros((nobs + 6, nobs + 6))
+                # B, L = np.zeros((nobs + 6, AllStateNum)), np.zeros((nobs + 6, 1))
+
+                # # prior for first frame in window
+                # B[: 6, : 6] = np.identity(6)
+                # R[: 6, : 6] = np.identity(6) * 1E-7
+                N[:6, :6] += np.identity(6) * 1E7
+            NPrior_inv = np.linalg.inv(NPrior_inv)
+
+            for LocalID in range(len(frames)):
+                frame = frames[LocalID]
+                tec, Rec = frame.m_pos, frame.m_rota
+                features = frame.m_features
+                
+                J, P_obs, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
+                obsnum = l.shape[0]
+
+                B[TotalObsNum : TotalObsNum + obsnum, :] = J
+                L[TotalObsNum : TotalObsNum + obsnum, :] = l
+                R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = np.linalg.inv(P_obs)
+
+                if obsnum <= 9:
+                    return -1
+                print(obsnum)
+                N += J.transpose() @ P_obs @ J
+                b += J.transpose() @ P_obs @ l
+                TotalObsNum += obsnum
+            
+            # NPrior, bPrior, NPrior_inv, XPrior, dX = self.premarginalization(windowsize, AllStateNum, StateFrame)
+            # P_obs = np.identity(nobs) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
+            # N = B.transpose() @ P_obs @ B + NPrior
+            # b = B.transpose() @ P_obs @ L + bPrior
+
+            # R = np.identity(nobs) * (self.m_PixelStd * self.m_PixelStd)
+            # K = NPrior_inv @ B.transpose() @ np.linalg.inv(B @ NPrior_inv @ B.transpose() + R)
+            # state = XPrior + K @ (L - B @ XPrior)
+            # StateFrame = state
+
+            print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
+            N += NPrior + np.identity(N.shape[0]) * 1E-7
+            # N[:6, :6] += np.identity(6) * 1E7
+            b += bPrior
+
+            # if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
+            #     N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000
+            K = NPrior_inv @ B.transpose() @ np.linalg.inv(B @ NPrior_inv @ B.transpose() + R)
+            state = XPrior + K @ (L - B @ XPrior)
+            # else:
+            #     np.savetxt("./debug/NPrior.txt", NPrior)
+            #     np.savetxt("./debug/N.txt", N)
+            # test = np.linalg.inv(N ) @ (b)
+            StateFrame = state[: windowsize_tmp * 6]
+
+            for j in range(windowsize_tmp):  
+                frames[j].m_pos =  frames[j].m_pos - state[j * 6: j * 6 + 3, :]
+                frames[j].m_rota = frames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                frames[j].m_rota = UnitRotation(frames[j].m_rota)
+
+            StateFrameNum = windowsize_tmp * 6
+            for id_ in self.m_MapPoints.keys():
+                position = self.m_MapPoints[id_]
+                self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
+            # self.check(map, camera)
+            if self.removeOutlier(map, camera):
+                self.loadstates(frames, self.m_MapPoints_Point)
+                prevstate = state
+                # if iter > 0:
+                iter -= 1
+                continue
+
+            if iter >= 1 and np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2) < 1E-2:
+                break
+            if iter != 9:
+                prevstate = state
+            iter += 1
+        print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
+        if windowsize_tmp == windowsize:
+            self.marginalization(N, b, windowsize_tmp)
+        count = 0
+        for id, point in mappoints.items():
+            if point.m_buse == -1:
+                continue
+            # if len(point.m_obs) > 4:
+            #     point.m_buse = 1
+                # continue
+            # point.m_buse = True
+            count += 1
+            for obs in point.m_obs:
+                obs.m_buse = True
+        
+        return 1
+
+    def removeOutlier(self, map, camera):
+        frames = map.m_frames
+
+        resi_dict = {}
+        for frame in frames:
+            tec, Rec = frame.m_pos, frame.m_rota
+            features = frame.m_features
+            for feat in features:
+                mappoint = feat.m_mappoint
+                if mappoint.m_buse < 1:
+                    continue
+                if feat.m_buse == False:
+                    continue
+                pointPos = mappoint.m_pos
+                pointPos_c = np.matmul(Rec, (pointPos - tec))
+                uv = camera.project(pointPos_c)
+                resi_dict[feat] = np.linalg.norm(uv - feat.m_pos, 2)
+        resi_dict = dict(sorted(resi_dict.items(), key=lambda x: x[1]))
+
+        # chi2 test for outlier remove
+        thres = 7.991
+        iter, inlier, outlier = 0, 0, 0
+        while iter < 5:
+            for key, value in resi_dict.items():
+                if value > thres:
+                    outlier += 1
+                else:
+                    inlier += 1
+            
+            if float(inlier) / (outlier + inlier) > 0.5:
+                break
+            else:
+                thres *= 2
+                iter += 1
+        
+        bOutlier = False
+        keys, values = list(resi_dict.keys()), list(resi_dict.values())
+        for i in range(len(keys)):
+            if resi_dict[keys[i]] >= thres:
+                keys[i].m_buse = False
+                if keys[i].m_frame.check() < 4:
+                    for feat in keys[i].m_frame.m_features:
+                        if resi_dict[keys[i]] >= 3 * thres:
+                            feat.m_buse = False
+                            continue
+                        feat.m_buse = True
+                    continue
+                bOutlier = True
+        
+
+
+
+        # down = int(len(resi_dict) * 0.25)
+        # up = int(len(resi_dict) * 0.75)
+        
+        # k = 1.5
+        # normal_range = values[up] - values[down]
+        # outlier_up = values[up] + k * normal_range
+
+        # bOutlier = False
+        # for i in range(up, len(keys)):
+        #     if resi_dict[keys[i]] >= outlier_up:
+        #         keys[i].m_buse = False
+        #         bOutlier = True
+
+        mappoints = map.m_points
+        for id, point in mappoints.items():
+            if point.m_buse == -1:
+                continue
+            
+            for obs in point.m_obs:
+                tc, Rc = obs.m_frame.m_pos, obs.m_frame.m_rota
+                point_cam = Rc @ (point.m_pos - tc)
+                if point_cam[2, 0] < 0:
+                    point.m_buse = -1
+
+            # point.check()
+
+        for frame in frames:
+            countl, countf = 0, 0
+            for feat in frame.m_features:
+                feat.m_mappoint.check()
+                if feat.m_mappoint.m_buse == 1:
+                    countl += 1
+                if feat.m_buse:
+                    countf += 1
+            print("frame", frame.m_id, " used", countl, "landmarks,", countf, "features")
+        return bOutlier
+
+    def savestates(self, frames, mappoints):
+        self.m_save_frames = copy.deepcopy(frames)
+        self.m_save_mappoints = copy.deepcopy(mappoints)
+
+    def loadstates(self, frames, mappoints):
+        for i in range(len(frames)):
+            frames[i].m_pos = self.m_save_frames[i].m_pos.copy()
+            frames[i].m_rota = self.m_save_frames[i].m_rota.copy()
+        
+        for key, value in mappoints.items():
+            value.m_pos = self.m_save_mappoints[key].m_pos.copy()
+
+    def __addFeaturesKitti(self, features):
+        count = 0
+        for feat in features:
+            mappoint = feat.m_mappoint
+            mappoint.check()
+            if mappoint.m_buse < 1:
+                continue
+            if feat.m_buse == True:
+                count += 1
+            mappointID = mappoint.m_id
+            if mappointID in self.m_MapPoints.keys():
+                continue
+            self.m_MapPoints[mappointID] = self.m_MapPointPos
+            self.m_MapPoints_Point[mappointID] = mappoint
+            self.m_MapPointPos += 3
+        return count
+
+
+    def setMEQ_Kitti(self, tec, Rec, features, camera, windowsize, LocalID):
+
+        statenum = windowsize * 6 + len(self.m_MapPoints) * 3
+        obsnum = 0
+        FrameStateNum = windowsize * 6
+        thres = 5.991
+
+        for feat in features:
+            mappoint = feat.m_mappoint
+            if mappoint.m_buse < 1:
+                continue
+            if feat.m_buse == False:
+                continue
+            obsnum += 1
+
+        # for row in range(len(features)):
+        #     feat = features[row]
+        #     mappoint = feat.m_mappoint
+        #     if mappoint.m_buse >= 1:
+        #         obsnum += 1
+        obsnum *= 3
+        J, l, P = np.zeros((obsnum, statenum)), np.zeros((obsnum, 1)), np.zeros((obsnum, obsnum))
+        fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
+
+        row = 0
+        for feat in features:
+            mappoint = feat.m_mappoint
+            if mappoint.m_buse < 1:
+                continue
+            if feat.m_buse == False:
+                continue
+            pointID = mappoint.m_id
+            pointPos = mappoint.m_pos
+            nobs = len(mappoint.m_obs)
+            a = np.linalg.norm(pointPos, 2)
+            pointPos_c = np.matmul(Rec, (pointPos - tec))
+            uv = camera.project(pointPos_c)
+            uv_obs = feat.m_pos
+            PointIndex = self.m_MapPoints[pointID]
+            l_sub = uv - uv_obs
+            l[row * 3: row * 3 + 3, :] = l_sub
+
+            P_sub = robustKernelHuber(l_sub, thres)
+            P_sub = np.diag(P_sub.flatten())
+            P[row * 3: row * 3 + 3, row * 3: row * 3 + 3] = P_sub @ np.identity(3) * (1.0 / (self.m_PixelStd ** 2))
+
+            Jphi = Jacobian_phai(Rec, tec, pointPos, pointPos_c, fx, fy, b)
+            Jrcam = Jacobian_rcam(Rec, pointPos_c, fx, fy, b)
+            JPoint = Jacobian_Point(Rec, pointPos_c, fx, fy, b)
+
+            J[row * 3: row * 3 + 3, LocalID * 6 : LocalID * 6 + 3] = Jrcam
+            J[row * 3: row * 3 + 3, LocalID * 6 + 3 : LocalID * 6 + 6] = Jphi
+            J[row * 3: row * 3 + 3, FrameStateNum + PointIndex : FrameStateNum + PointIndex + 3] = JPoint
+            row += 1
+
+        return J, P, l
 
         
 
