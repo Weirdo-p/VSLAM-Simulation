@@ -622,13 +622,13 @@ class CLS:
             
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
             NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
-
+            np.savetxt("./debug/Nprior_cls.txt", NPrior)
             if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
-                N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000 # + np.identity(6) * 1E-7
+                N[:6, :6] = N[:6, :6] + np.identity(6) * 1E7 # + np.identity(6) * 1E-7
             # else:
             #     np.savetxt("./debug/NPrior.txt", NPrior)
             #     np.savetxt("./debug/N.txt", N) + np.identity(N.shape[0]) * 1E-7
-            state = np.linalg.inv(N + NPrior + np.identity(N.shape[0]) * 1E-7) @ (b + bPrior)
+            state = np.linalg.inv(N + NPrior + np.identity(N.shape[0]) * 1E-8) @ (b + bPrior)
             StateFrame = state[: windowsize_tmp * 6]
 
             for j in range(windowsize_tmp):  
@@ -655,6 +655,7 @@ class CLS:
             iter += 1
         print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
         if windowsize_tmp == windowsize:
+            np.savetxt("./debug/N_cls.txt", N)
             self.marginalization(N, b, windowsize_tmp)
         count = 0
         for id, point in mappoints.items():

@@ -852,10 +852,10 @@ class KalmanFilter:
             # print(L)
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L
-            # NPrior = B.transpose() @ P @ L + np.identity(NPrior.shape[0]) * 1E-8
-            NPrior_inv = np.linalg.inv(NPrior)
+            NPrior_inv = self.m_StateCov.copy()
         else:
             FrameStateNum = windowsize * 6
+            mapping = {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
             for mappointID, GlobalPos in self.m_MapPoints.items():
                 if mappointID in self.m_LandmarkLocal.keys():
@@ -866,8 +866,9 @@ class KalmanFilter:
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                 bPrior[gpos: gpos + 3, : ] = self.m_bmarg[lpos: lpos + 3, :]
+        # np.savetxt("./debug/NPrior.txt", NPrior)
             
-            Nmarg = self.m_Nmarg.copy()
+            # Nmarg = self.m_Nmarg.copy()
             # if np.all(NPrior == 0):
             #     Nmarg[:6, :6] = self.m_Nmarg[:6, :6] + np.identity(6) * 10000000
 
@@ -1043,10 +1044,11 @@ class KalmanFilter:
             StateFrame = np.zeros((windowsize_tmp * 6, 1))
 
             NPrior, bPrior, NPrior_inv, XPrior, dX = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
-            NPrior_inv = NPrior + np.identity(NPrior.shape[0]) * 1E-7
+            # NPrior_inv = NPrior + np.identity(NPrior.shape[0]) * 1E-8
+            np.savetxt("./debug/Nprior_filter.txt", NPrior)
             
             if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
-                NPrior_inv[:6, :6] = NPrior_inv[:6, :6] + np.identity(6) * 1E7
+                # NPrior_inv[:6, :6] = NPrior_inv[:6, :6] + np.identity(6) * 1E7
                 # TotalObsNum = 6
                 # R = np.zeros((nobs + 6, nobs + 6))
                 # B, L = np.zeros((nobs + 6, AllStateNum)), np.zeros((nobs + 6, 1))
@@ -1055,7 +1057,7 @@ class KalmanFilter:
                 # B[: 6, : 6] = np.identity(6)
                 # R[: 6, : 6] = np.identity(6) * 1E-7
                 N[:6, :6] += np.identity(6) * 1E7
-            NPrior_inv = np.linalg.inv(NPrior_inv)
+            # NPrior_inv = np.linalg.inv(NPrior_inv)
 
             for LocalID in range(len(frames)):
                 frame = frames[LocalID]
@@ -1065,9 +1067,9 @@ class KalmanFilter:
                 J, P_obs, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
                 obsnum = l.shape[0]
 
-                B[TotalObsNum : TotalObsNum + obsnum, :] = J
-                L[TotalObsNum : TotalObsNum + obsnum, :] = l
-                R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = np.linalg.inv(P_obs)
+                # B[TotalObsNum : TotalObsNum + obsnum, :] = J
+                # L[TotalObsNum : TotalObsNum + obsnum, :] = l
+                # R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = P_obs
 
                 if obsnum <= 9:
                     return -1
@@ -1075,6 +1077,9 @@ class KalmanFilter:
                 N += J.transpose() @ P_obs @ J
                 b += J.transpose() @ P_obs @ l
                 TotalObsNum += obsnum
+            # P = R.copy()
+            # R = np.identity(R.shape[0])
+            # P = np.linalg.inv(R)
             
             # NPrior, bPrior, NPrior_inv, XPrior, dX = self.premarginalization(windowsize, AllStateNum, StateFrame)
             # P_obs = np.identity(nobs) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
@@ -1087,18 +1092,19 @@ class KalmanFilter:
             # StateFrame = state
 
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
-            N += NPrior + np.identity(N.shape[0]) * 1E-7
-            # N[:6, :6] += np.identity(6) * 1E7
+            N += NPrior + np.identity(N.shape[0]) * 1E-8
             b += bPrior
 
             # if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
             #     N[:6, :6] = N[:6, :6] + np.identity(6) * 10000000
-            K = NPrior_inv @ B.transpose() @ np.linalg.inv(B @ NPrior_inv @ B.transpose() + R)
-            state = XPrior + K @ (L - B @ XPrior)
+            # K = np.linalg.inv(N) @ B.transpose() @ R
+            # K = NPrior_inv @ B.transpose() @ np.linalg.inv(B @ NPrior_inv @ B.transpose() + R)
+            # state = XPrior + K @ (L - B @ XPrior)
             # else:
             #     np.savetxt("./debug/NPrior.txt", NPrior)
             #     np.savetxt("./debug/N.txt", N)
-            # test = np.linalg.inv(N ) @ (b)
+            # NPrior = np.linalg.inv(NPrior_inv)
+            state = np.linalg.inv(N) @ (b)
             StateFrame = state[: windowsize_tmp * 6]
 
             for j in range(windowsize_tmp):  
@@ -1125,6 +1131,7 @@ class KalmanFilter:
             iter += 1
         print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
         if windowsize_tmp == windowsize:
+            np.savetxt("./debug/N_filter.txt", N)
             self.marginalization(N, b, windowsize_tmp)
         count = 0
         for id, point in mappoints.items():
