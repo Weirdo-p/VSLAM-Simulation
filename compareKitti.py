@@ -9,7 +9,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 0]
-posAttributes["ylim"] = [1, 1]
+posAttributes["ylim"] = [-1, 1]
 posAttributes["scientific"] = False
 
 posSubAtt = {}
@@ -49,7 +49,7 @@ attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 0]
-attAttributes["ylim"] = [1, 1]
+attAttributes["ylim"] = [-1, 1]
 attAttributes["scientific"] = False
 
 

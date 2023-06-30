@@ -161,17 +161,21 @@ class CLS:
             self.m_MapPointPos += 3
     
     def __addFeaturesKitti(self, features):
+        count = 0
         for feat in features:
             mappoint = feat.m_mappoint
             mappoint.check()
             if mappoint.m_buse < 1:
                 continue
+            if feat.m_buse == True:
+                count += 1
             mappointID = mappoint.m_id
             if mappointID in self.m_MapPoints.keys():
                 continue
             self.m_MapPoints[mappointID] = self.m_MapPointPos
             self.m_MapPoints_Point[mappointID] = mappoint
             self.m_MapPointPos += 3
+        return count
 
 
     def solveSequential(self, frames, camera, maxtime=-1, iteration=1):
@@ -604,7 +608,9 @@ class CLS:
             # 1. solve CLS problem by marginalizing landmark
             AllStateNum = windowsize_tmp * 6 + StateLandmark
             TotalObsNum = 0
-            N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
+            R = np.zeros((nobs, nobs))
+            B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
+            # N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
             StateFrame = np.zeros((windowsize_tmp * 6, 1))
             for LocalID in range(len(frames)):
                 frame = frames[LocalID]
@@ -613,16 +619,20 @@ class CLS:
                 
                 J, P_obs, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
                 obsnum = l.shape[0]
+                B[TotalObsNum : TotalObsNum + obsnum, :] = J
+                L[TotalObsNum : TotalObsNum + obsnum, :] = l
+                R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = P_obs
                 if obsnum <= 9:
                     return -1
-                print(obsnum)
-                N += J.transpose() @ P_obs @ J
-                b += J.transpose() @ P_obs @ l
+                # print(obsnum)
+                # N += J.transpose() @ P_obs @ J
+                # b += J.transpose() @ P_obs @ l
                 TotalObsNum += obsnum
-            
+            N = B.transpose() @ R @ B
+            b = B.transpose() @ R @ L
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
             NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
-            np.savetxt("./debug/Nprior_cls.txt", NPrior)
+
             if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
                 N[:6, :6] = N[:6, :6] + np.identity(6) * 1E7 # + np.identity(6) * 1E-7
             # else:
@@ -655,7 +665,6 @@ class CLS:
             iter += 1
         print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
         if windowsize_tmp == windowsize:
-            np.savetxt("./debug/N_cls.txt", N)
             self.marginalization(N, b, windowsize_tmp)
         count = 0
         for id, point in mappoints.items():

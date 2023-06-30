@@ -5,7 +5,7 @@ from camera import *
 import numpy as np
 import sys
 
-path_to_kitti = "/media/xuzhuo/T7/01-data/07-kitti/07/KITTI_07/Features/"
+path_to_kitti = "/home/xuzhuo/Documents/data/07-kitti/07/KITTI_07/Features/"
 path_to_feats = glob.glob(path_to_kitti + "*.txt")
 path_to_feats = sorted(path_to_feats, key=lambda name: float(name[len(path_to_kitti): len(name) - 4]))
 

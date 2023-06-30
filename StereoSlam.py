@@ -837,9 +837,12 @@ class StereoSlam:
     def runKittiVIO_FilterMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):
         self.m_map.m_points.clear()
 
+        self.m_ref = np.loadtxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/kitti_07_CLSMarg.txt")
+        self.m_refi = -1
         FrameNumInWindow = 0
         self.m_lframe = None
         for frame in self.m_frames:
+            self.m_refi += 1
             # 1. find correspondences
             if FrameNumInWindow < windowsize:
                 self.m_map.addNewFrame(frame, self.m_GlobMap)
@@ -848,7 +851,7 @@ class StereoSlam:
                     #TODO: remove the latest frame and its observations
                     self.removeNewFrame()
                     frame.reset()
-                    self.m_estimator.reset()
+                    self.m_filter.reset()
                     self.m_map.clear()
                     # self.m_map.addNewFrame(frame, self.m_GlobMap)
                     # self.TrackLastFrame()
@@ -865,7 +868,7 @@ class StereoSlam:
                 # clear all frames
                 # self.removeNewFrame()
                 frame.reset()
-                self.m_estimator.reset()
+                self.m_filter.reset()
                 self.m_map.clear()
                 # self.m_map.addNewFrame(frame, self.m_GlobMap)
                 if self.TrackLastFrame() == False:
