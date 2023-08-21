@@ -115,8 +115,8 @@ class StereoSlam:
             pos[2, 0] = a            # tec.reshape(3, -1)
             # pos.reshape(3, -1)
 
-            # if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
-            #     continue
+            if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
+                continue
             points.append(pos)
 
         
@@ -131,7 +131,8 @@ class StereoSlam:
         # y = points[:, 1]
         # points[:, 1] = points[:, 2]
         # points[:, 2] = y
-        plotmain.plotPointsWithTraj(path, points, "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/data/traj.svg")
+        print (path, points)
+        plotmain.plotPointsWithTraj(path, points, "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/traj.svg")
 
         
             
@@ -209,7 +210,7 @@ class StereoSlam:
     def __parseFeatureLine(self, line = str()):
         items = line.split()
 
-        MappointId, u, v, du, sigma = int(items[0]), float(items[1]), float(items[2]), float(items[3]), float(items[4])
+        MappointId, u, v, du = int(items[0]), float(items[1]), float(items[2]), float(items[3])
         feature = Feature(np.array([[u], [v], [du]]), du, MappointId)
 
         if MappointId not in self.m_map.m_points.keys():

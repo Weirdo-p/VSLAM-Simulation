@@ -341,10 +341,22 @@ def att2rot(att):
     """Transform euler angle to rotation matrix
 
     Args:
-        att (_type_): _description_
+        att (ndarray): [yaw pitch roll] in radians
     """
-    r = R.from_euler("zxy", att)
-    return r.as_dcm()
+    # R = np.zeros((3, 3))
+
+    # i, j, k -> p r y
+    sin, cos = np.sin(att), np.cos(att)
+    sk, si, sj = sin[0], sin[1], sin[2]
+    ck, ci, cj = cos[0], cos[1], cos[2]
+
+    R = np.array([[ cj*ck-si*sj*sk, -ci*sk,  sj*ck+si*cj*sk],
+                  [ cj*sk+si*sj*ck,  ci*ck,  sj*sk-si*cj*ck],
+                  [-ci*sj,           si,     ci*cj         ]])
+    
+    return R
+
+
 
 def SkewSymmetricMatrix(vector):
     """transfer to Skew-Symmetric Matrix

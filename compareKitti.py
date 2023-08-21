@@ -1,15 +1,16 @@
 import numpy as np
 import plotmain as main
 import glob
+from vcommon import *
 
 # define attribute
 plotAttributes = {}
 posAttributes = {}
-posAttributes["ylabel"] = "Error(m)"
+posAttributes["ylabel"] = "Position Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
-posAttributes["xlim"] = [0, 0]
-posAttributes["ylim"] = [-1, 1]
+posAttributes["xlim"] = [0, 120]
+posAttributes["ylim"] = [-8, 8]
 posAttributes["scientific"] = False
 
 posSubAtt = {}
@@ -45,11 +46,11 @@ velAttributes["subplot"] = velSubAtt
 
 
 attAttributes = {}
-attAttributes["ylabel"] = "Error(Deg)"
+attAttributes["ylabel"] = "Attitude Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
-attAttributes["xlim"] = [0, 0]
-attAttributes["ylim"] = [-1, 1]
+attAttributes["xlim"] = [0, 120]
+attAttributes["ylim"] = [-6, 6]
 attAttributes["scientific"] = False
 
 
@@ -73,40 +74,80 @@ prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
 cmp = "kitti"
 names = [".CLS_Seq", ".CLS"]
 
-# errors = {}
-
-# SortFunc = lambda name, name1: float(name[78: len(name) - len(name1) - 1])
-# for i in range(len(names)):
-#     Files = glob.glob(prefix + "*" + names[i])
-#     Files = sorted(Files, key=lambda name: float(name[78: len(name) - len(names[i]) - 1]))
-
-#     error = []
-
-#     for file in Files:
-#         data = np.loadtxt(file)
-#         print(data[-1:, ].shape)
-#         error.append(data[-1:, ])
-    
-#     errors[names[i]] = np.array(error)
-#     dim1, dim2 = errors[names[i]].shape[0], errors[names[i]].shape[2]
-#     errors[names[i]] = errors[names[i]].reshape(dim1, dim2)
-
-# print(errors[names[0]][:, 1:])
-# compare = errors[names[0]][:, 1:] - errors[names[1]][:, 1:]
-# # print(errors[names[0]].reshape(dim1, dim2))
-# time = errors[names[0]][:, 0]
-
+#%% CLS - FILTER
 CLS = np.loadtxt(prefix + "kitti_07_CLSMarg.txt")
 Filter = np.loadtxt(prefix + "kitti_07_FilterMarg.txt")
 
+def findGT(time, gt):
+    pos, rota = 0, 0
+    for row in range(gt.shape[0]):
+        if np.abs(time - gt[row, 0]) >= 1E-1:
+            continue
+        Trans = np.reshape(gt[row, 1:], (3, 4))
+        rota, pos = Trans[:3, :3], np.reshape(Trans[:3, 3], (3,1))
+
+    return rota, pos
+
+#%% absolute error (CLS)
+gtprefix = "/media/xuzhuo/T7/01-data/07-kitti/07/"
+gt_file = gtprefix + "07.txt"
+gttimes_file = gtprefix + "times.txt"
+
+gt = np.loadtxt(gt_file)
+gttimes = np.loadtxt(gttimes_file)
+gt = np.insert(gt, 0, gttimes, axis=1)
+
+pos_error, att_error = [], []
+
+for row in range(CLS.shape[0]):
+    rota_gt, pos_gt = findGT(CLS[row, 0], gt)
+    att_gt = rot2att(np.linalg.inv(rota_gt)) * R2D
+    att, pos = CLS[row, 4: ], np.reshape(CLS[row, 1: 4], (3, 1))
+
+    for i in range(3):
+        if att_gt[i] > 150:
+            att_gt[i] -= 180
+        if att_gt[i] < -150:
+            att_gt[i] += 180
+
+        if att[i] > 150:
+            att[i] -= 180
+        if att[i] < -150:
+            att[i] += 180
+
+    att_error.append(att - att_gt)
+    pos_error.append((pos_gt - pos).transpose().flatten())
+
 time = CLS[:, 0]
 time -= time[0]
+att_error, pos_error = np.array(att_error), np.array(pos_error)
+main.ploterror(time, att_error, prefix + "/" + "kitti_att_cls.svg", plotAttributes["att"], False)
+main.ploterror(time, pos_error, prefix + "/" + "kitti_pos_cls.svg", plotAttributes["pos"], False)
 
-error = CLS - Filter
-orders = ["pos", "att"]
-j = 0
-for i in range(1, len(orders) * 3 - 1, 3):
-    start, end = i, i + 3
-    main.ploterror(time, error[:, start : end], prefix + "/" + orders[j] + cmp + ".svg", plotAttributes[orders[j]], False)
-    print(orders[j], error[-1:, start: end] / 1593.8890000000001)
-    j += 1
+#%% absolut 
+
+pos_error, att_error = [], []
+for row in range(Filter.shape[0]):
+    rota_gt, pos_gt = findGT(Filter[row, 0], gt)
+    att_gt = rot2att(np.linalg.inv(rota_gt)) * R2D
+    att, pos = Filter[row, 4: ], np.reshape(Filter[row, 1: 4], (3, 1))
+
+    for i in range(3):
+        if att_gt[i] > 150:
+            att_gt[i] -= 180
+        if att_gt[i] < -150:
+            att_gt[i] += 180
+
+        if att[i] > 150:
+            att[i] -= 180
+        if att[i] < -150:
+            att[i] += 180
+
+    att_error.append(att - att_gt)
+    pos_error.append((pos_gt - pos).transpose().flatten())
+
+time = Filter[:, 0]
+time -= time[0]
+att_error, pos_error = np.array(att_error), np.array(pos_error)
+main.ploterror(time, att_error, prefix + "/" + "kitti_att_filter.svg", plotAttributes["att"], False)
+main.ploterror(time, pos_error, prefix + "/" + "kitti_pos_filter.svg", plotAttributes["pos"], False)

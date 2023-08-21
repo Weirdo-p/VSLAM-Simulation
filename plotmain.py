@@ -242,7 +242,7 @@ def plotTraj(time, trajs={ }, save='./'):
         each one is a traj(in enu-frame)
     """
     plt.figure(figsize=(5.0393701, 5.0393701))
-    plt.subplots_adjust(hspace=0.5,wspace=0.6)
+    # plt.subplots_adjust(hspace=0.5,wspace=0.6)
     grey = [(191 / 255), (191 / 255), (191 / 255)]
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.direction'] = 'in'
@@ -259,7 +259,7 @@ def plotTraj(time, trajs={ }, save='./'):
     plt.grid(linestyle='-', color=grey, alpha=0.5, linewidth=1)
     i = 0
     for key in trajs.keys():
-        plt.plot(trajs[key][:, 1], trajs[key][:, 0], label=key, color=color[i])
+        plt.plot(trajs[key][:, 0], trajs[key][:, 1], label=key, color=color[i])
         i += 1
     font_={
       'family':'Cambria',
@@ -269,16 +269,17 @@ def plotTraj(time, trajs={ }, save='./'):
     plt.xticks(size = 11, fontproperties='Cambria')
     plt.yticks(size = 11, fontproperties='Cambria')
     legend = plt.legend(loc='upper right', fontsize = 11, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.0209, 1.1), fancybox=False)
-    plt.subplots_adjust(left=0.1, right=0.9, bottom=0.09, top=0.91, wspace=0.01, hspace=0.1)
+    plt.subplots_adjust(left=0.12, right=0.98, bottom=0.09, top=0.91, wspace=0.01, hspace=0.1)
     ax = legend.get_frame()
     ax.set_alpha(1)
     ax.set_facecolor('none')
     xmajorLocator  = MultipleLocator(30)
     ymajorLocator  = MultipleLocator(10)
-    plt.ylim(-60, 60)
-    plt.xlim(-50, 60)
-    plt.ylabel("m", fontdict=font_)
-    plt.xlabel("m", fontdict=font_)
+    plt.ylim(-100, 150)
+    plt.xlim(-225, 25)
+    plt.xticks([-225, -175, -125, -75, -25, 25])
+    plt.ylabel("y (m)", fontdict=font_)
+    plt.xlabel("x (m)", fontdict=font_)
     # plt.subplot(gs[9:, 1:])
     # ax = plt.gca()
     # # ax.set_aspect(1)
@@ -611,11 +612,12 @@ def CompareCov(time_data1, time_data2, data1, data2, label1, label2, save):
     plt.show()
 
 def plotPointsWithTraj(trajs=[], points=[], save="./"):
-
+    plt.ioff()
+    plt.close()
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.direction'] = 'in'
     ax = plt.figure(figsize=(6, 6)).add_subplot(projection='3d')
-    ax.view_init(elev=35, azim=45, roll=0)
+    ax.view_init(elev=45, azim=60, roll=0)
     # direc = ["Y", "P", "R"]
     marker=["o", "^", "D"]
     # print(save)
@@ -625,7 +627,7 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     # if i != 2:
     #     plt.setp(ax.get_xticklabels(), visible=False)
     # plt.grid(b=False, linestyle='--', color='k', alpha=0.5)
-    # ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color[3], s=30)
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], color=color[3], s=30)
     ax.plot(trajs[:, 0], trajs[:, 1], trajs[:, 2], linewidth=4, c=color[2])
     # ax.grid(False)
     ax.ticklabel_format(style='sci', axis='x')
@@ -635,10 +637,10 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0))
     ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0))
     ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0))
-    ax.set_zlim(0, 10)
+    # ax.set_zlim(0, 10)
     ax.set_xticks([-50, -30, -10, 10, 30, 50])
     ax.set_yticks([-50, -30, -10, 10, 30, 50])
-    # ax.set_zticks([-50, -30, -10, 10, 30, 50])
+    ax.set_zticks([-50, -30, -10, 10, 30, 50])
     ax.set_xlabel("x (m)", fontdict=font)
     ax.set_ylabel("y (m)", fontdict=font)
     ax.set_zlabel("z (m)", fontdict=font)
