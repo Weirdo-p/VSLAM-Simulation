@@ -254,6 +254,8 @@ class StereoSlam:
         Args:
             mode (int, optional): 0: Linearize observation model without liearization error. Defaults to 0.
         """
+        plt.ioff()
+        plt.close()
         if mode == 0:
             self.runVIOWithoutError(path_to_output, maxtime)
         elif mode == 1:
@@ -657,9 +659,9 @@ class StereoSlam:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time
 
         if bNoiseData:
-            output = path_to_output + "."+str(maxtime)+"s.CLS_SW_Marg.Noise"
+            output = path_to_output + "."+str(maxtime)+"s.CLS_SW_Marg1.Noise"
         else:
-            output = path_to_output + "."+str(maxtime)+"s.CLS_SW_Marg"
+            output = path_to_output + "."+str(maxtime)+"s.CLS_SW_Marg1"
 
         f = open(output, "w")
         f.close()

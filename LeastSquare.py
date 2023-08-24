@@ -17,6 +17,8 @@ class CLS:
         self.m_Nmarg = 0
         self.m_bmarg = 0
         self.m_LandmarkLocal = {}
+        self.m_FrameFEJ = {}
+        self.m_LandmarkFEJ = {}
     
     def reset(self):
         self.m_MapPoints = {}       # position of mappoint in state vector
@@ -511,6 +513,7 @@ class CLS:
             TotalObsNum = 0
             B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
             for LocalID, frame in LocalFrames.items():
+                # frame_FEJ = self.getFrameFEJ(frame)
                 tec, Rec = frame.m_pos, frame.m_rota
                 features = frame.m_features
                 obsnum = len(features) * 3
@@ -521,23 +524,20 @@ class CLS:
                 TotalObsNum += obsnum
 
             NPrior, bPrior = self.premarginalization(windowsize, AllStateNum, StateFrame)
+            Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
+            # print (np.max(bcom))
 
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/NPrior.txt", NPrior)
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/bPrior.txt", bPrior)
             P_obs = np.identity(nobs) * (1.0 / (self.m_PixelStd * self.m_PixelStd))
 
             N = B.transpose() @ P_obs @ B + NPrior
-            b = B.transpose() @ P_obs @ L + bPrior
+            b = B.transpose() @ P_obs @ L + bPrior + bcom
             state = np.linalg.inv(N) @ b
-            # state[: windowsize * 6, :] += StateFrame
             StateFrame = state[: windowsize * 6]
             self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov.txt", state)
-            # print(NPrior)
-            # print(bPrior)
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/cls_sw_stateX.txt", state)
-            # break
 
+            self.marginalization(N, b, windowsize)
             # 2. update states. evaluate jacobian at groundtruth, do not update.
             for j in range(Local):  
                 LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -560,7 +560,6 @@ class CLS:
             Local -= 1
             StateFrame[: tmp, :] = StateFrame[6:, :]
             StateFrame[tmp:, :] = 0
-            self.marginalization(N, b, windowsize)
         return frames
 
     def solveKitti(self, map, camera, windowsize=20):
@@ -853,11 +852,25 @@ class CLS:
         b_marg = b2 - N12_T @ N11_inv @ b1
 
         # step 4: specify map point ID -- position in N_marg
+        # if camera goes back to the same place, errors will increase in simulation
+
+        items_to_remove = []
+        for mappointID, value in self.m_LandmarkFEJ.items():
+            if mappointID not in self.m_MapPoints.keys():
+                items_to_remove.append(mappointID)
+        
+        for item in items_to_remove:
+            del self.m_LandmarkFEJ[item]
+
         LandmarkLocal = {}
         for i in range(len(ConnectedNodes)):
             for mappointID, value in self.m_MapPoints.items():
                 if ConnectedNodes[i] * 3 == value:
                     LandmarkLocal[mappointID] = i
+
+                    # fix linearization point
+                    if mappointID not in self.m_LandmarkFEJ.keys():
+                        self.m_LandmarkFEJ[mappointID] = copy.deepcopy(self.m_MapPoints_Point[mappointID].m_pos)
                     break
 
         self.m_Nmarg = N_marg
@@ -869,6 +882,66 @@ class CLS:
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/N.txt", N)
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/b_sub.txt", b_sub)
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/b.txt", b)
+
+    def getFrameFEJ(self, frame):
+        id_to_find = frame.m_id
+        if id_to_find in self.m_FrameFEJ.keys():
+            return self.m_FrameFEJ[id_to_find]
+        else:
+            frame_to_return = copy.deepcopy(frame)
+            self.m_FrameFEJ[id_to_find] = frame_to_return
+            return frame_to_return
+
+    def getLandmarkFEJ(self, landmark):
+        id_to_find = landmark.m_id
+        if id_to_find in self.m_LandmarkFEJ.keys():
+            return self.m_LandmarkFEJ[id_to_find]
+        else:
+            # landmark_to_return = copy.deepcopy(landmark)
+            # self.m_LandmarkFEJ[id_to_find] = landmark_to_return
+            return landmark.m_pos.copy()
+
+    def compensateFEJ(self, NPrior, windowsize=20):
+        Ncom, bcom = 0, 0
+        if len(self.m_LandmarkLocal) == 0:
+            return Ncom, bcom
+
+        FrameStateNum, StateLandmark = windowsize * 6, len(self.m_MapPoints) * 3
+        mapping = {}
+
+        for mappointID, GlobalPos in self.m_MapPoints.items():
+            if mappointID in self.m_LandmarkLocal.keys():
+                LocalPos = self.m_LandmarkLocal[mappointID] * 3
+                mapping[GlobalPos + FrameStateNum] = LocalPos
+        if self.m_Nmarg.shape[0] != 0:
+            # differences of constrained landmarks.
+            # note that frames are not constrained in this case
+            # frame of Xdiff remains 0
+            Xdiff = np.zeros((FrameStateNum + StateLandmark, 1))
+            for mappointID, point in self.m_MapPoints_Point.items():
+                pos = self.m_MapPoints[mappointID] + FrameStateNum
+                point_FEJ = self.getLandmarkFEJ(point)
+                Xdiff[pos: pos + 3, :] = point.m_pos - point_FEJ
+                # print(np.linalg.norm(Xdiff[pos: pos + 3, :]))
+
+            
+            Ncom, bcom = NPrior.copy(), NPrior @ Xdiff
+            print(np.max(np.abs(Xdiff)), np.min(Xdiff))
+            # J = np.linalg.cholesky(self.m_Nmarg).transpose()
+            # J_return = np.zeros(NPrior.shape)
+            # for gpos, lpos in mapping.items():
+            #     for gpos1, lpos1 in mapping.items():
+            #         J_return[gpos: gpos + 3, gpos1: gpos1 + 3] = J[lpos: lpos + 3, lpos1: lpos1 + 3]
+
+            
+            # validate / debug -----------
+            # print (np.all(np.abs(J_return.transpose() @ J_return - NPrior)) < 1E-9)
+            # marginalization should constrain landmarks only
+            # print (np.all(NPrior[: FrameStateNum, : FrameStateNum] == 0))
+            # print (np.all(Xdiff == 0))
+            # --------------------
+            
+        return Ncom, bcom
 
     def premarginalization(self, windowsize, StateNum, StateFrame):
         """Prepare prior information produced by marginalization
@@ -887,6 +960,7 @@ class CLS:
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L
         else:
+            # TODO: decompose Nmarg->J and compensate J.transpose()*(X-X0)
             FrameStateNum = windowsize * 6
             mapping = {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
@@ -899,7 +973,7 @@ class CLS:
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                 bPrior[gpos: gpos + 3, : ] = self.m_bmarg[lpos: lpos + 3, :]
-        # np.savetxt("./debug/NPrior.txt", NPrior)
+        # np.savetxt("./debug/NPrior.txt", NPrior)        
         return NPrior, bPrior
 
 
@@ -946,8 +1020,9 @@ class CLS:
         for row in range(obsnum):
             feat = features[row]
             mappoint = feat.m_mappoint
+            pointPos = self.getLandmarkFEJ(mappoint)
             pointID = mappoint.m_id
-            pointPos = mappoint.m_pos
+            # pointPos = mappoint.m_pos
             pointPos_c = np.matmul(Rec, (pointPos - tec))
             uv = camera.project(pointPos_c)
             uv_obs = feat.m_pos
