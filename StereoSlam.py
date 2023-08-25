@@ -782,9 +782,9 @@ class StereoSlam:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time
 
         if bNoiseData:
-            output = path_to_output + "."+str(maxtime)+"s.Filter_SW_Marg.Noise"
+            output = path_to_output + "."+str(maxtime)+"s.Filter_SW_Marg1.Noise"
         else:
-            output = path_to_output + "."+str(maxtime)+"s.Filter_SW_Marg"
+            output = path_to_output + "."+str(maxtime)+"s.Filter_SW_Marg1"
 
         f = open(output, "w")
         f.close()
