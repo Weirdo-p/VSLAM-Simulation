@@ -4,6 +4,9 @@ from StereoSlam import *
 from camera import *
 import numpy as np
 import sys
+
+from numpy import seterr
+seterr(all='raise')
 #%%  initialization files
 sys.setrecursionlimit(3000)
 path_to_simu = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation (copy)/data/"
@@ -72,5 +75,5 @@ while time <= -1:
     Slam.m_estimator.m_AttStd = AttStd
     Slam.m_estimator.m_PointStd = PointStd
     Slam.m_camera = cam
-    Slam.runVIO(8, path_to_output, Slam_gt.m_frames, Slam_linear.m_frames, time, True, 1, 20)
+    Slam.runVIO(7, path_to_output, Slam_gt.m_frames, Slam_linear.m_frames, time, True, 1, 20)
     time += step

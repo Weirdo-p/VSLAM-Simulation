@@ -537,7 +537,7 @@ class CLS:
             StateFrame = state[: windowsize * 6]
             self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
 
-            self.marginalization(N, b, windowsize)
+            self.marginalization(windowsize, LocalFrames, camera, NPrior, bPrior)
             # 2. update states. evaluate jacobian at groundtruth, do not update.
             for j in range(Local):  
                 LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -807,7 +807,21 @@ class CLS:
             
             
     
-    def marginalization(self, N, b, WindowSize):
+    def marginalization(self, WindowSize, LocalFrame, camera, NPrior, bPrior):
+
+        FirstLocalID = list(LocalFrame.keys())[0]
+        frame = LocalFrame[FirstLocalID]
+        tec, Rec = frame.m_pos, frame.m_rota
+        features = frame.m_features
+
+        J, l = self.setMEQ_SW(tec, Rec, features, camera, WindowSize, FirstLocalID)
+        # J = J[:, [not np.all(J[:, i] == 0) for i in range(J.shape[1])]]
+        # l = l[[not np.all(l[i] == 0) for i in range(l.shape[0])], :]
+        P_obs = np.identity(J.shape[0]) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
+        N = J.transpose() @ P_obs @ J + NPrior
+
+        # N1 = N1[[not np.all(N1[i] == 0) for i in range(N1.shape[0])], :]
+        # N1 = N1[:, [not np.all(N1[:, i] == 0) for i in range(N1.shape[1])]]
         # step 1: check connected states
         # marginalize oldest frame in the window, only landmarks connected
         PosLandmarkStart = WindowSize * 6
@@ -833,14 +847,15 @@ class CLS:
 
             # diagonal
             N_sub[6 + i * 3: 6 + (i + 1) * 3, 6 + i * 3: 6 + (i + 1) * 3] = N[PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3, PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3]
-        
+        # np.savetxt("./log/N_sub.txt", N_sub)
         # step 2.2 matrix of b
+        b_all = J.transpose() @ P_obs @ l + bPrior
         b_sub = np.zeros((NumMargNodes, 1))
-        b_sub[:6, :] = b[:6, :]
+        b_sub[:6, :] = b_all[:6, :]
 
         for i in range(len(ConnectedNodes)):
             col = ConnectedNodes[i]
-            b_sub[6 + i * 3: 6 + (i + 1) * 3, :] = b[PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3, :]
+            b_sub[6 + i * 3: 6 + (i + 1) * 3, :] = b_all[PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3, :]
         
         # step 3: marginalization
         N11, N22, N12 = N_sub[: 6, : 6], N_sub[6:, 6: ], N_sub[: 6, 6: ]
@@ -851,9 +866,11 @@ class CLS:
         N_marg = N22 - N12_T @ N11_inv @ N12
         b_marg = b2 - N12_T @ N11_inv @ b1
 
-        # step 4: specify map point ID -- position in N_marg
-        # if camera goes back to the same place, errors will increase in simulation
+        # test = np.linalg.pinv(N1)[windowsize*6:, windowsize*6: ]
 
+        # print(test[:75, :75] - np.linalg.pinv(N_marg))
+
+        # step 4: specify map point ID -- position in N_marg
         items_to_remove = []
         for mappointID, value in self.m_LandmarkFEJ.items():
             if mappointID not in self.m_MapPoints.keys():
@@ -867,7 +884,6 @@ class CLS:
             for mappointID, value in self.m_MapPoints.items():
                 if ConnectedNodes[i] * 3 == value:
                     LandmarkLocal[mappointID] = i
-
                     # fix linearization point
                     if mappointID not in self.m_LandmarkFEJ.keys():
                         self.m_LandmarkFEJ[mappointID] = copy.deepcopy(self.m_MapPoints_Point[mappointID].m_pos)
@@ -876,7 +892,6 @@ class CLS:
         self.m_Nmarg = N_marg
         self.m_bmarg = b_marg
         self.m_LandmarkLocal = LandmarkLocal
-        # np.savetxt("./debug/Nmarg.txt", self.m_Nmarg)
 
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/N_sub.txt", N_sub)
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/N.txt", N)
