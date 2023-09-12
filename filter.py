@@ -798,50 +798,20 @@ class KalmanFilter:
         tec, Rec = frame.m_pos, frame.m_rota
         features = frame.m_features
 
+        # step 1: select to-be-removed states and measurements
         J, l = self.setMEQ_SW(tec, Rec, features, camera, WindowSize, FirstLocalID)
-        # J = J[:, [not np.all(J[:, i] == 0) for i in range(J.shape[1])]]
-        # l = l[[not np.all(l[i] == 0) for i in range(l.shape[0])], :]
         P_obs = np.identity(J.shape[0]) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
-        N = J.transpose() @ P_obs @ J + NPrior
+        N = J.transpose() @ P_obs @ J
+        HaveValue = np.diagonal(N) != 0
+        N += NPrior
 
-        # N1 = N1[[not np.all(N1[i] == 0) for i in range(N1.shape[0])], :]
-        # N1 = N1[:, [not np.all(N1[:, i] == 0) for i in range(N1.shape[1])]]
-        # step 1: check connected states
-        # marginalize oldest frame in the window, only landmarks connected
-        PosLandmarkStart = WindowSize * 6
-        NumLandmarks = (N.shape[0] - PosLandmarkStart) / 3
-        ConnectedNodes = []         # i-th landmark
+        N = N[[HaveValue[i] for i in range(len(HaveValue))], :]
+        N_sub = N[:, [HaveValue[i] for i in range(len(HaveValue))]]
 
-        for i in range(int(NumLandmarks)):
-            if np.all(N[0: 6, PosLandmarkStart + i * 3 : PosLandmarkStart + (i + 1) * 3] != 0):
-                ConnectedNodes.append(i)
-        NumConectedNodes = len(ConnectedNodes)
-        NumMargNodes = 6 + NumConectedNodes * 3
-
-        # step 2:   generate new matrix with removed nodes and its connected nodes
-        # step 2.1: information matrix
-        N_sub = np.zeros((NumMargNodes, NumMargNodes))
-        N_sub[: 6, : 6] = N[: 6, : 6]
-        for i in range(len(ConnectedNodes)):
-            col = ConnectedNodes[i]
-
-            # non-diagonal
-            N_sub[: 6, 6 + i * 3: 6 + (i + 1) * 3] = N[: 6, PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3]
-            N_sub[6 + i * 3: 6 + (i + 1) * 3, : 6] = N[: 6, PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3].transpose()
-
-            # diagonal
-            N_sub[6 + i * 3: 6 + (i + 1) * 3, 6 + i * 3: 6 + (i + 1) * 3] = N[PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3, PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3]
-        # np.savetxt("./log/N_sub.txt", N_sub)
-        # step 2.2 matrix of b
         b_all = J.transpose() @ P_obs @ l + bPrior
-        b_sub = np.zeros((NumMargNodes, 1))
-        b_sub[:6, :] = b_all[:6, :]
-
-        for i in range(len(ConnectedNodes)):
-            col = ConnectedNodes[i]
-            b_sub[6 + i * 3: 6 + (i + 1) * 3, :] = b_all[PosLandmarkStart + col * 3: PosLandmarkStart + (col + 1) * 3, :]
+        b_sub = b_all[[HaveValue[i] for i in range(len(HaveValue))], :]
         
-        # step 3: marginalization
+        # step 2: marginalization
         N11, N22, N12 = N_sub[: 6, : 6], N_sub[6:, 6: ], N_sub[: 6, 6: ]
         b1, b2 = b_sub[: 6, :], b_sub[6:, :]
 
@@ -850,11 +820,7 @@ class KalmanFilter:
         N_marg = N22 - N12_T @ N11_inv @ N12
         b_marg = b2 - N12_T @ N11_inv @ b1
 
-        # test = np.linalg.pinv(N1)[windowsize*6:, windowsize*6: ]
-
-        # print(test[:75, :75] - np.linalg.pinv(N_marg))
-
-        # step 4: specify map point ID -- position in N_marg
+        # step 3: specify map point ID -- position in N_marg
         items_to_remove = []
         for mappointID, value in self.m_LandmarkFEJ.items():
             if mappointID not in self.m_MapPoints.keys():
@@ -863,6 +829,8 @@ class KalmanFilter:
         for item in items_to_remove:
             del self.m_LandmarkFEJ[item]
 
+        PosLandmarkStart = WindowSize * 6
+        ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=120 and index % 3 == 0]
         LandmarkLocal = {}
         for i in range(len(ConnectedNodes)):
             for mappointID, value in self.m_MapPoints.items():
@@ -1441,17 +1409,29 @@ class KalmanFilter:
         tec, Rec = frame.m_pos, frame.m_rota
         features = frame.m_features
 
+        # TODO: 选出来NPrior中参与边缘化的部分
+        # J矩阵考虑窗口为1，去除空列
+        # l矩阵去除空行
         J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, FirstLocalID)
         P_obs = np.identity(J.shape[0]) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
         N = J.transpose() @ P_obs @ J
-        K = np.linalg.pinv(N) @ J.transpose() @ P_obs
+        HaveValue = np.diagonal(N) != 0
+        N += NPrior
 
-        D = np.linalg.pinv(N + NPrior) # (np.identity(K.shape[0]) - K @ J) @ NPrior_inv
-        Dtest = np.linalg.inv(N1test)[windowsize * 6: , windowsize * 6: ]
+        np.savetxt("./debug/N_cov.txt", N)
 
-        DConvey = D[windowsize * 6: , windowsize * 6: ]
+        N = N[[HaveValue[i] for i in range(len(HaveValue))], :]
+        N = N[:, [HaveValue[i] for i in range(len(HaveValue))]]
+        # np.savetxt("./debug/N_cov.txt", N)
+        np.savetxt("./debug/NPrior.txt", NPrior)
+        # K = np.linalg.pinv(N) @ J.transpose() @ P_obs
+
+        D = np.linalg.pinv(N) # (np.identity(K.shape[0]) - K @ J) @ NPrior_inv
+        # Dtest = np.linalg.inv(N1test)[windowsize * 6: , windowsize * 6: ]
+
+        DConvey = D[6: , 6: ]
         print(DConvey[: 75, :75] - np.linalg.inv(self.m_Nmarg))
-        print(np.linalg.inv(self.m_Nmarg) - Dtest[: 75, :75])
+        # print(np.linalg.inv(self.m_Nmarg) - Dtest[: 75, :75])
 
     def savestates(self, frames, mappoints):
         self.m_save_frames = copy.deepcopy(frames)
