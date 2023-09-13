@@ -833,8 +833,8 @@ class CLS:
 
         N12_T = N12.transpose()
         N11_inv = np.linalg.inv(N11)
-        N_marg = N22 - N12_T @ N11_inv @ N12
-        b_marg = b2 - N12_T @ N11_inv @ b1
+        N_marg = N_sub # N22 - N12_T @ N11_inv @ N12
+        b_marg = b_sub # b2 - N12_T @ N11_inv @ b1
 
         # step 3: specify map point ID -- position in N_marg
         items_to_remove = []
@@ -929,21 +929,39 @@ class CLS:
     def premarginalization(self, windowsize, StateNum, StateFrame):
         """Prepare prior information produced by marginalization
         """
+        StateFrameSize = windowsize * 6
+        StateLandmark = len(self.m_MapPoints) * 3
 
-        NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+        NPrior, NPrior_inv, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+        # set diagnoal to micro-value
+        mapping = {}
+        PoseCov = np.identity(6)
+        PoseCov[:3, :3] *= (self.m_PosStd ** 2)
+        PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
+
+        j = 0
+        while True:
+            NPrior_inv[j: j + 6, j: j + 6] = PoseCov
+            j += 6
+
+            if j >= StateFrameSize:
+                break
+        NPrior_inv[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+        NPrior = np.linalg.inv(NPrior_inv)
+
         if len(self.m_LandmarkLocal) == 0:
-            L = np.zeros((StateNum, 1))
+            B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
             P = np.zeros((StateNum, StateNum))
             B = np.identity(StateNum)
             P = np.linalg.inv(self.m_StateCov)
+
             L[: windowsize * 6, :] = StateFrame 
-
             # print(L)
-
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L
+            NPrior_inv = self.m_StateCov.copy()
         else:
-            # TODO: decompose Nmarg->J and compensate J.transpose()*(X-X0)
+            Nmarg, bmarg = self.submarg()
             FrameStateNum = windowsize * 6
             mapping = {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
@@ -951,13 +969,51 @@ class CLS:
                 if mappointID in self.m_LandmarkLocal.keys():
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
-            
+            for mappointID in self.m_LandmarkLocal.keys():
+                if mappointID not in self.m_MapPoints.keys():
+                    print("test")
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
-                    NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
-                bPrior[gpos: gpos + 3, : ] = self.m_bmarg[lpos: lpos + 3, :]
-        # np.savetxt("./debug/NPrior.txt", NPrior)        
-        return NPrior, bPrior
+                    NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
+                    # NPrior_inv[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Dmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
+                bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
+            
+        return NPrior, bPrior #, NPrior_inv, X_return, dX
+        
+    def submarg(self):
+        N_sub, b_sub = self.m_Nmarg, self.m_bmarg
+        # check observability of landmarks
+        # ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=120 and index % 3 == 0]
+        LandmarkRemove = []
+       
+        for mappointid, localpos in self.m_LandmarkLocal.items():
+            if mappointid not in self.m_MapPoints.keys():
+                for i in range(3):
+                    LandmarkRemove.append((mappointid, localpos + i + 6))
+        
+        for index in LandmarkRemove:
+            id = index[0]
+            N_sub = np.delete(N_sub, index[1], 0)
+            N_sub = np.delete(N_sub, index[1], 1)
+            b_sub = np.delete(b_sub, index[1], 0)
+
+        for index in LandmarkRemove:
+            if index[0] in self.m_LandmarkLocal.keys():
+                del self.m_LandmarkLocal[index[0]]
+        pos = 0
+        for id in self.m_LandmarkLocal.keys():
+            self.m_LandmarkLocal[id] = pos
+            pos += 1
+        
+        N11, N22, N12 = N_sub[: 6, : 6], N_sub[6:, 6: ], N_sub[: 6, 6: ]
+        b1, b2 = b_sub[: 6, :], b_sub[6:, :]
+
+        N12_T = N12.transpose()
+        N11_inv = np.linalg.inv(N11)
+        Nmarg = N22 - N12_T @ N11_inv @ N12
+        bmarg = b2 - N12_T @ N11_inv @ b1
+
+        return Nmarg, bmarg
 
 
     def setMEQ_AllState(self, tec, Rec, features, camera, frame_i):

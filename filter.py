@@ -38,6 +38,8 @@ class KalmanFilter:
         self.m_MapPoints_Point_linear = {}       # position of mappoint in state vector
         self.m_estimateFrame = []
         self.m_Nmarg = np.zeros((0, 0))
+        self.m_Xmarg = np.zeros((0, 0))
+        self.m_Dmarg = np.zeros((0, 0))
         self.m_bmarg = np.zeros((0, 0))
         self.m_LandmarkLocal = {}
         self.m_FrameFEJ = {}
@@ -753,20 +755,23 @@ class KalmanFilter:
 
                 TotalObsNum += obsnum
 
-            NPrior, bPrior = self.premarginalization(windowsize, AllStateNum, StateFrame)
+            NPrior, bPrior, NPrior_inv = self.premarginalization(windowsize, AllStateNum, StateFrame)
             Ncom, bcom, dx = self.compensateFEJ(NPrior, windowsize)
 
             N = N_obs + NPrior
             NPrior_inv = np.linalg.pinv(NPrior)
 
             XPrior = NPrior_inv @ bPrior
+            # if self.m_Xmarg.shape[0] != 0:
+            #     if np.any(np.abs(XPrior - XPrior1) > 1E-5):
+            #         print(XPrior - XPrior1)
             state =  dx + XPrior + np.linalg.inv(N) @ (b_obs - N_obs @ (XPrior + dx))
 
             StateFrame = state[: windowsize * 6]
 
             # update covariance
             self.marginalization(windowsize, LocalFrames, camera, NPrior, bPrior)
-            # self.UpdateCov(LocalFrames, NPrior, NPrior_inv, camera, windowsize, N)
+            # self.UpdateCov(LocalFrames, NPrior, NPrior_inv, camera, windowsize, bPrior)
             # 2. update states. evaluate jacobian at groundtruth, do not update.
             for j in range(Local):  
                 LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -790,6 +795,35 @@ class KalmanFilter:
             StateFrame[tmp: StateFrameSize, :] = 0
             self.m_MapPoints_Prev = self.m_MapPoints
         return frames
+    
+    def CovConstraint(self, windowsize, StateNum):
+        NPrior, NPrior_inv, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+        # set diagnoal to micro-value
+        NPrior_inv *= 1E7
+        mapping = {}
+        if len(self.m_LandmarkLocal) == 0:
+            B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            P = np.zeros((StateNum, StateNum))
+            B = np.identity(StateNum)
+            P = np.linalg.inv(self.m_StateCov)
+
+            L[: windowsize * 6, :] = 0 
+            # print(L)
+            NPrior = B.transpose() @ P @ B
+            bPrior = B.transpose() @ P @ L
+            NPrior_inv = self.m_StateCov.copy()
+        else:
+            FrameStateNum = windowsize * 6
+            mapping = {}
+            # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            for mappointID, GlobalPos in self.m_MapPoints.items():
+                if mappointID in self.m_LandmarkLocal.keys():
+                    LocalPos = self.m_LandmarkLocal[mappointID] * 3
+                    mapping[GlobalPos + FrameStateNum] = LocalPos
+            for gpos, lpos in mapping.items():
+                for gpos1, lpos1 in mapping.items():
+                    NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
+                bPrior[gpos: gpos + 3, : ] = self.m_bmarg[lpos: lpos + 3, :]
 
     def marginalization(self, WindowSize, LocalFrame, camera, NPrior, bPrior):
 
@@ -812,13 +846,8 @@ class KalmanFilter:
         b_sub = b_all[[HaveValue[i] for i in range(len(HaveValue))], :]
         
         # step 2: marginalization
-        N11, N22, N12 = N_sub[: 6, : 6], N_sub[6:, 6: ], N_sub[: 6, 6: ]
-        b1, b2 = b_sub[: 6, :], b_sub[6:, :]
-
-        N12_T = N12.transpose()
-        N11_inv = np.linalg.inv(N11)
-        N_marg = N22 - N12_T @ N11_inv @ N12
-        b_marg = b2 - N12_T @ N11_inv @ b1
+        N_marg = N_sub # N22 - N12_T @ N11_inv @ N12
+        b_marg = b_sub # b2 - N12_T @ N11_inv @ b1
 
         # step 3: specify map point ID -- position in N_marg
         items_to_remove = []
@@ -844,11 +873,6 @@ class KalmanFilter:
         self.m_Nmarg = N_marg
         self.m_bmarg = b_marg
         self.m_LandmarkLocal = LandmarkLocal
-
-        # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/N_sub.txt", N_sub)
-        # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/N.txt", N)
-        # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/b_sub.txt", b_sub)
-        # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/b.txt", b)
 
     def compensateFEJ(self, NPrior, windowsize=20):
         Ncom, bcom, Xdiff = 0, 0, 0
@@ -905,11 +929,26 @@ class KalmanFilter:
     def premarginalization(self, windowsize, StateNum, StateFrame):
         """Prepare prior information produced by marginalization
         """
+        StateFrameSize = windowsize * 6
+        StateLandmark = len(self.m_MapPoints) * 3
 
-        NPrior, NPrior_inv, bPrior = np.zeros((StateNum, StateNum)), np.identity(StateNum), np.zeros((StateNum, 1))
+        NPrior, NPrior_inv, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
         # set diagnoal to micro-value
-        NPrior_inv *= 1E7
         mapping = {}
+        PoseCov = np.identity(6)
+        PoseCov[:3, :3] *= (self.m_PosStd ** 2)
+        PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
+
+        j = 0
+        while True:
+            NPrior_inv[j: j + 6, j: j + 6] = PoseCov
+            j += 6
+
+            if j >= StateFrameSize:
+                break
+        NPrior_inv[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+        NPrior = np.linalg.inv(NPrior_inv)
+
         if len(self.m_LandmarkLocal) == 0:
             B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
             P = np.zeros((StateNum, StateNum))
@@ -922,6 +961,7 @@ class KalmanFilter:
             bPrior = B.transpose() @ P @ L
             NPrior_inv = self.m_StateCov.copy()
         else:
+            Nmarg, bmarg = self.submarg()
             FrameStateNum = windowsize * 6
             mapping = {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
@@ -929,13 +969,16 @@ class KalmanFilter:
                 if mappointID in self.m_LandmarkLocal.keys():
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
-            
+            for mappointID in self.m_LandmarkLocal.keys():
+                if mappointID not in self.m_MapPoints.keys():
+                    print("test")
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
-                    NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
-                bPrior[gpos: gpos + 3, : ] = self.m_bmarg[lpos: lpos + 3, :]
-            # np.savetxt("./debug/NPrior.txt", NPrior)
+                    NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
+                    # NPrior_inv[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Dmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
+                bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
             
+            # np.savetxt("./debug/NPrior_marg.txt", self.m_Nmarg)
         #     # Nmarg = self.m_Nmarg.copy()
         #     # if np.all(NPrior == 0):
         #     #     Nmarg[:6, :6] = self.m_Nmarg[:6, :6] + np.identity(6) * 10000000
@@ -989,11 +1032,45 @@ class KalmanFilter:
         # #     NPrior[:6, :6] = NPrior[:6, :6] + np.identity(6) * 10000000
         # #     NPrior_inv[:6, :6] = NPrior_inv[:6, :6] + np.identity(6) * 10000000
 
-        return NPrior, bPrior #, NPrior_inv, X_return, dX
+        return NPrior, bPrior, NPrior_inv #, NPrior_inv, X_return, dX
         
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/J_return.txt", J_return)
         # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/J.txt", J)
 
+    def submarg(self):
+        N_sub, b_sub = self.m_Nmarg, self.m_bmarg
+        # check observability of landmarks
+        # ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=120 and index % 3 == 0]
+        LandmarkRemove = []
+       
+        for mappointid, localpos in self.m_LandmarkLocal.items():
+            if mappointid not in self.m_MapPoints.keys():
+                for i in range(3):
+                    LandmarkRemove.append((mappointid, localpos + i + 6))
+        
+        for index in LandmarkRemove:
+            id = index[0]
+            N_sub = np.delete(N_sub, index[1], 0)
+            N_sub = np.delete(N_sub, index[1], 1)
+            b_sub = np.delete(b_sub, index[1], 0)
+
+        for index in LandmarkRemove:
+            if index[0] in self.m_LandmarkLocal.keys():
+                del self.m_LandmarkLocal[index[0]]
+        pos = 0
+        for id in self.m_LandmarkLocal.keys():
+            self.m_LandmarkLocal[id] = pos
+            pos += 1
+        
+        N11, N22, N12 = N_sub[: 6, : 6], N_sub[6:, 6: ], N_sub[: 6, 6: ]
+        b1, b2 = b_sub[: 6, :], b_sub[6:, :]
+
+        N12_T = N12.transpose()
+        N11_inv = np.linalg.inv(N11)
+        Nmarg = N22 - N12_T @ N11_inv @ N12
+        bmarg = b2 - N12_T @ N11_inv @ b1
+
+        return Nmarg, bmarg
 
 
     def __addFeatures(self, features):
@@ -1403,34 +1480,63 @@ class KalmanFilter:
             print("frame", frame.m_id, " used", countl, "landmarks,", countf, "features")
         return bOutlier
 
-    def UpdateCov(self, LocalFrame, NPrior, NPrior_inv, camera, windowsize, N1test):
+    def UpdateCov(self, LocalFrame, NPrior, NPrior_inv, camera, windowsize, bPrior):
         FirstLocalID = list(LocalFrame.keys())[0]
         frame = LocalFrame[FirstLocalID]
         tec, Rec = frame.m_pos, frame.m_rota
         features = frame.m_features
 
-        # TODO: 选出来NPrior中参与边缘化的部分
-        # J矩阵考虑窗口为1，去除空列
-        # l矩阵去除空行
+        # step 1: update cov
         J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, FirstLocalID)
         P_obs = np.identity(J.shape[0]) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
         N = J.transpose() @ P_obs @ J
         HaveValue = np.diagonal(N) != 0
         N += NPrior
 
-        np.savetxt("./debug/N_cov.txt", N)
-
         N = N[[HaveValue[i] for i in range(len(HaveValue))], :]
         N = N[:, [HaveValue[i] for i in range(len(HaveValue))]]
-        # np.savetxt("./debug/N_cov.txt", N)
-        np.savetxt("./debug/NPrior.txt", NPrior)
-        # K = np.linalg.pinv(N) @ J.transpose() @ P_obs
 
-        D = np.linalg.pinv(N) # (np.identity(K.shape[0]) - K @ J) @ NPrior_inv
-        # Dtest = np.linalg.inv(N1test)[windowsize * 6: , windowsize * 6: ]
+        # NOTE: Due to numeric problem, covariance is updated by formula used
+        # in LS instead of EKF, but which are mathematically equivalent
+        D = np.linalg.pinv(N)[6:, 6: ]
 
-        DConvey = D[6: , 6: ]
-        print(DConvey[: 75, :75] - np.linalg.inv(self.m_Nmarg))
+        # step 2: regard as virtual observations
+        b_all = J.transpose() @ P_obs @ l + bPrior
+        b_all = b_all[[HaveValue[i] for i in range(len(HaveValue))], :]
+        N11, N12 = N[: 6, : 6], N[: 6, 6: ]
+        b1, b2 = b_all[: 6, :], b_all[6:, :]
+
+        N12_T = N12.transpose()
+        N11_inv = np.linalg.inv(N11)
+        b_marg = b2 - N12_T @ N11_inv @ b1
+
+        # self.m_Xmarg = D @ b_marg
+        # self.m_Nmarg = np.linalg.inv(D)
+        # self.m_Dmarg = D
+        # self.m_bmarg = b_marg
+
+        # step 3: specify map point ID -- position in N_marg
+        items_to_remove = []
+        for mappointID, value in self.m_LandmarkFEJ.items():
+            if mappointID not in self.m_MapPoints.keys():
+                items_to_remove.append(mappointID)
+        
+        for item in items_to_remove:
+            del self.m_LandmarkFEJ[item]
+
+        PosLandmarkStart = windowsize * 6
+        ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=120 and index % 3 == 0]
+        LandmarkLocal = {}
+        for i in range(len(ConnectedNodes)):
+            for mappointID, value in self.m_MapPoints.items():
+                if ConnectedNodes[i] * 3 == value:
+                    LandmarkLocal[mappointID] = i
+                    # fix linearization point
+                    if mappointID not in self.m_LandmarkFEJ.keys():
+                        self.m_LandmarkFEJ[mappointID] = copy.deepcopy(self.m_MapPoints_Point[mappointID].m_pos)
+                    break
+
+        self.m_LandmarkLocal = LandmarkLocal
         # print(np.linalg.inv(self.m_Nmarg) - Dtest[: 75, :75])
 
     def savestates(self, frames, mappoints):
