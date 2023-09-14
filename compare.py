@@ -8,7 +8,7 @@ posAttributes = {}
 posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
-posAttributes["xlim"] = [0, 70]
+posAttributes["xlim"] = [0, 0]
 posAttributes["ylim"] = [-1, 1]
 posAttributes["scientific"] = False
 
@@ -96,8 +96,8 @@ names = [".CLS_Seq", ".CLS"]
 # # print(errors[names[0]].reshape(dim1, dim2))
 # time = errors[names[0]][:, 0]
 
-CLS = np.loadtxt(prefix + "result.txt.-1s.CLS_SW_Marg1.Noise")
-Filter = np.loadtxt(prefix + "result.txt.-1s.Filter_SW_Marg1.Noise")
+CLS = np.loadtxt(prefix + "kitti_07_CLSMarg1.txt")
+Filter = np.loadtxt(prefix + "kitti_07_FilterMarg1.txt")
 
 time = CLS[:, 0]
 time -= time[0]

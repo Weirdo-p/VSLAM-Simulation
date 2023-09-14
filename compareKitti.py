@@ -75,8 +75,8 @@ cmp = "kitti"
 names = [".CLS_Seq", ".CLS"]
 
 #%% CLS - FILTER
-CLS = np.loadtxt(prefix + "kitti_07_CLSMarg.txt")
-Filter = np.loadtxt(prefix + "kitti_07_FilterMarg.txt")
+CLS = np.loadtxt(prefix + "kitti_07_CLSMarg1.txt")
+Filter = np.loadtxt(prefix + "kitti_07_FilterMarg1.txt")
 
 def findGT(time, gt):
     pos, rota = 0, 0
@@ -121,8 +121,8 @@ for row in range(CLS.shape[0]):
 time = CLS[:, 0]
 time -= time[0]
 att_error, pos_error = np.array(att_error), np.array(pos_error)
-main.ploterror(time, att_error, prefix + "/" + "kitti_att_cls.svg", plotAttributes["att"], False)
-main.ploterror(time, pos_error, prefix + "/" + "kitti_pos_cls.svg", plotAttributes["pos"], False)
+main.ploterror(time, att_error, prefix + "/" + "kitti_att_cls1.svg", plotAttributes["att"], False)
+main.ploterror(time, pos_error, prefix + "/" + "kitti_pos_cls1.svg", plotAttributes["pos"], False)
 
 #%% absolut 
 
@@ -149,5 +149,5 @@ for row in range(Filter.shape[0]):
 time = Filter[:, 0]
 time -= time[0]
 att_error, pos_error = np.array(att_error), np.array(pos_error)
-main.ploterror(time, att_error, prefix + "/" + "kitti_att_filter.svg", plotAttributes["att"], False)
-main.ploterror(time, pos_error, prefix + "/" + "kitti_pos_filter.svg", plotAttributes["pos"], False)
+main.ploterror(time, att_error, prefix + "/" + "kitti_att_filter1.svg", plotAttributes["att"], False)
+main.ploterror(time, pos_error, prefix + "/" + "kitti_pos_filter1.svg", plotAttributes["pos"], False)
