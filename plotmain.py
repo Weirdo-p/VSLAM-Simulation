@@ -259,7 +259,7 @@ def plotTraj(time, trajs={ }, save='./'):
     plt.grid(linestyle='-', color=grey, alpha=0.5, linewidth=1)
     i = 0
     for key in trajs.keys():
-        plt.plot(trajs[key][:, 0], trajs[key][:, 1], label=key, color=color[i])
+        plt.plot(trajs[key][:, 0], trajs[key][:, 2], label=key, color=color[i])
         i += 1
     font_={
       'family':'Cambria',

@@ -88,6 +88,11 @@ def findGT(time, gt):
 
     return rota, pos
 
+# traj = {}
+# traj["SWO"] = CLS[:, 1 :]
+# time = CLS[:, 0]
+# main.plotTraj(time, traj)
+
 #%% absolute error (CLS)
 gtprefix = "/media/xuzhuo/T7/01-data/07-kitti/07/"
 gt_file = gtprefix + "07.txt"

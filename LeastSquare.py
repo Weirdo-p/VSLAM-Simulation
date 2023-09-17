@@ -626,7 +626,7 @@ class CLS:
             #     np.savetxt("./debug/NPrior.txt", NPrior)
             #     np.savetxt("./debug/N.txt", N) + np.identity(N.shape[0]) * 1E-7
             state = np.linalg.inv(N + NPrior) @ (b + bPrior + bcom)
-            StateFrame = state[: windowsize_tmp * 6]
+            # StateFrame = state[: windowsize_tmp * 6]
 
             for j in range(windowsize_tmp):  
                 frames[j].m_pos =  frames[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -998,7 +998,7 @@ class CLS:
             B = np.identity(StateNum)
             P = NPrior
 
-            L[: windowsize * 6, :] = StateFrame 
+            L[: windowsize * 6, :] = 0 
             # print(L)
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L

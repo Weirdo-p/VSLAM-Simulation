@@ -894,7 +894,7 @@ class StereoSlam:
         plt.plot(array[:, 0], array[:, 2])
         plt.show()
 
-        with open("./log/kitti_07_FilterMarg.txt", "a") as f:
+        with open("./log/kitti_07_FilterMarg3.txt", "a") as f:
             for frame in self.m_frames:
                 twc, Rwc = frame.m_pos, frame.m_rota
                 att = rot2att(Rwc) * R2D
@@ -955,7 +955,7 @@ class StereoSlam:
         plt.plot(array[:, 0], array[:, 2])
         plt.show()
 
-        with open("./log/kitti_07_CLSMarg1.txt", "a") as f:
+        with open("./log/kitti_07_CLSMarg11.txt", "a") as f:
             for frame in self.m_frames:
                 twc, Rwc = frame.m_pos, frame.m_rota
                 att = rot2att(Rwc) * R2D
