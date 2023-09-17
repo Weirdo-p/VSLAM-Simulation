@@ -45,6 +45,7 @@ class KalmanFilter:
         self.m_lmarg = np.zeros((0, 0))
         self.m_Npmarg = np.zeros((0, 0))
         self.m_bpmarg = np.zeros((0, 0))
+        self.m_Xpmarg = np.zeros((0, 0))
         self.m_Pobsmarg = np.zeros((0, 0))
         self.m_LandmarkLocal = {}
         self.m_FrameFEJ = {}
@@ -760,16 +761,17 @@ class KalmanFilter:
                 TotalObsNum += obsnum
 
 
-            bPrior, NPrior_inv = self.CovConstraint(windowsize, AllStateNum)
+            NPrior_inv, XPrior = self.CovConstraint(windowsize, AllStateNum)
             dx = self.compensateFEJ(windowsize)
             P_obs = np.identity(nobs) * (self.m_PixelStd * self.m_PixelStd)
             K = NPrior_inv @ B.transpose() @ np.linalg.inv(P_obs + B @ NPrior_inv @ B.transpose())
-            XPrior = NPrior_inv @ bPrior
+            # XPrior = NPrior_inv @ bPrior
+            # print(np,all(np.abs(XPrior1 - XPrior) < 1E-5))
             state = dx + XPrior + K @ (L - B @ (XPrior + dx))
             StateFrame = state[: windowsize * 6]
 
             # update covariance
-            self.UpdateCov(LocalFrames, NPrior_inv, camera, windowsize, bPrior)
+            self.UpdateCov(LocalFrames, NPrior_inv, camera, windowsize, XPrior)
 
             # 2. update states. evaluate jacobian at groundtruth, do not update.
             for j in range(Local):  
@@ -802,6 +804,7 @@ class KalmanFilter:
         StateLandmark = len(self.m_MapPoints) * 3
 
         NPrior, NPrior_inv, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+        state_prior = np.zeros((StateNum, 1))
         # set diagnoal to micro-value
         mapping = {}
         PoseCov = np.identity(6)
@@ -828,7 +831,7 @@ class KalmanFilter:
             # print(L)
             bPrior = B.transpose() @ P @ L
         else:
-            bmarg, Dmarg = self.submarg()
+            Dmarg, dx = self.submarg()
             FrameStateNum = windowsize * 6
             mapping = {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
@@ -840,9 +843,10 @@ class KalmanFilter:
                 for gpos1, lpos1 in mapping.items():
                     # NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                     NPrior_inv[gpos: gpos + 3, gpos1: gpos1 + 3] = Dmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
-                bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
+                # bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
+                state_prior[gpos: gpos + 3, : ] = dx[lpos: lpos + 3, :]
 
-        return bPrior, NPrior_inv #, NPrior_inv, X_return, dX
+        return NPrior_inv, state_prior #, NPrior_inv, X_return, dX
 
 
     def CovConstraint_Kitti(self, windowsize, StateNum):
@@ -1105,13 +1109,6 @@ class KalmanFilter:
         Np = Np[:, [i not in LandmarkRemove for i in range(Np.shape[1])]]
         bp = bp[[i not in LandmarkRemove for i in range(bp.shape[0])], :]
 
-        # for index in LandmarkRemove:
-        #     id = index[0]
-        #     J = np.delete(J, index[1], 1)
-        #     Np = np.delete(Np, index[1], 0)
-        #     Np = np.delete(Np, index[1], 1)
-        #     bp = np.delete(bp, index[1], 0)
-
         for id in LandmarkRemoveID:
             if id in self.m_LandmarkLocal.keys():
                 del self.m_LandmarkLocal[id]
@@ -1125,17 +1122,11 @@ class KalmanFilter:
 
         K = NPrior_inv @ J.transpose() @ np.linalg.inv(np.linalg.inv(P_obs) + J @ NPrior_inv @ J.transpose())
         Dmarg = (np.identity(K.shape[0]) - K @ J) @ NPrior_inv
+        Xp = NPrior_inv @ bp
+        dx = Xp + K @ (l - J @ Xp)
+        self.m_Jmarg, self.m_lmarg, self.m_bpmarg, self.m_Xpmarg = J, l, Np, bp
 
-        # b
-        N_sub, b_sub = J.transpose() @ P_obs @ J + Np, J.transpose() @ P_obs @ l + bp
-        N11, N12 = N_sub[: 6, : 6], N_sub[: 6, 6: ]
-        b1, b2 = b_sub[: 6, :], b_sub[6:, :]
-
-        N12_T = N12.transpose()
-        N11_inv = np.linalg.inv(N11)
-        bmarg = b2 - N12_T @ N11_inv @ b1
-
-        return bmarg, Dmarg[6:, 6: ]
+        return Dmarg[6:, 6: ], dx[6:, :]
 
 
     def submarg_Kitti(self):
@@ -1618,7 +1609,7 @@ class KalmanFilter:
             print("frame", frame.m_id, " used", countl, "landmarks,", countf, "features")
         return bOutlier
 
-    def UpdateCov(self, LocalFrame, NPrior_inv, camera, windowsize, bPrior):
+    def UpdateCov(self, LocalFrame, NPrior_inv, camera, windowsize, XPrior):
         FirstLocalID = list(LocalFrame.keys())[0]
         frame = LocalFrame[FirstLocalID]
         tec, Rec = frame.m_pos, frame.m_rota
@@ -1635,13 +1626,16 @@ class KalmanFilter:
         J = J[:, [HaveValue[i] for i in range(len(HaveValue))]]
         # l = l[[HaveValue[i] for i in range(len(HaveValue))], :]
         NPrior = np.linalg.inv(NPrior_inv)
+        bp = NPrior @ XPrior
         Np = NPrior[:, [HaveValue[i] for i in range(len(HaveValue))]]
         Np = Np[[HaveValue[i] for i in range(len(HaveValue))], :]
-        bp = bPrior[[HaveValue[i] for i in range(len(HaveValue))], :]
+        # Xp = XPrior[[HaveValue[i] for i in range(len(HaveValue))], :]
+        bp = bp[[HaveValue[i] for i in range(len(HaveValue))], :]
 
         self.m_Jmarg, self.m_lmarg, self.m_Npmarg, self.m_bpmarg = J, l, Np, bp
+        # self.m_bpmarg = bp
 
-        # step 3: specify map point ID -- position in N_marg
+        # step 2: specify map point ID -- position in N_marg
         items_to_remove = []
         for mappointID, value in self.m_LandmarkFEJ.items():
             if mappointID not in self.m_MapPoints.keys():

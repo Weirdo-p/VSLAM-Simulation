@@ -96,8 +96,8 @@ names = [".CLS_Seq", ".CLS"]
 # # print(errors[names[0]].reshape(dim1, dim2))
 # time = errors[names[0]][:, 0]
 
-CLS = np.loadtxt(prefix + "kitti_07_CLSMarg1.txt")
-Filter = np.loadtxt(prefix + "kitti_07_FilterMarg1.txt")
+CLS = np.loadtxt(prefix + "result.txt.-1s.CLS_SW_Marg1.Noise")
+Filter = np.loadtxt(prefix + "result.txt.-1s.Filter_SW_Marg1.Noise")
 
 time = CLS[:, 0]
 time -= time[0]
