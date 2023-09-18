@@ -9,7 +9,7 @@ from numpy import seterr
 seterr(all='raise')
 #%%  initialization files
 sys.setrecursionlimit(3000)
-path_to_simu = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation (copy)/data/"
+path_to_simu = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/image/Features/"
 path_to_point = glob.glob(path_to_simu + "*.pc.noise")[0]
 path_to_frame = glob.glob(path_to_simu + "*.fm.noise")[0]
 path_to_feats = glob.glob(path_to_simu + "*.txt")
@@ -37,6 +37,7 @@ Slam_gt = StereoSlam()
 Slam_gt.m_map.readMapFile(path_to_point_gt)
 # print(path_to_feats)
 Slam_gt.readFrameFile(path_to_frame_gt, path_to_feats_gt)
+Slam_gt.plot()
 
 Slam_linear = StereoSlam()
 Slam_linear.m_map.readMapFile(path_to_point_gt)

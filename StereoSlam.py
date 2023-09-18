@@ -94,6 +94,7 @@ class StereoSlam:
         path, points = [], []
 
         Rec0, tec0 = self.m_frames[0].m_rota, self.m_frames[0].m_pos 
+        print(Rec0)
         for i in range(len(self.m_frames)):
             if i == 0:
                 continue
@@ -131,8 +132,8 @@ class StereoSlam:
         # y = points[:, 1]
         # points[:, 1] = points[:, 2]
         # points[:, 2] = y
-        print (path, points)
-        plotmain.plotPointsWithTraj(path, points, "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/traj.svg")
+        print (path[:, 2])
+        plotmain.plotPointsWithTraj(path, points, "")
 
         
             

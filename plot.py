@@ -12,7 +12,7 @@ import plotmain as main
 
 #%% init result file
 prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
-name = "result.txt.-1s.Filter_SW_Marg1.Noise"
+name = "result.txt.-1s.CLS_SW_Marg1.Noise"
 path_to_output = prefix + name
 
 

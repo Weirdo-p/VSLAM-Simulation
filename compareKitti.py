@@ -75,8 +75,8 @@ cmp = "kitti"
 names = [".CLS_Seq", ".CLS"]
 
 #%% CLS - FILTER
-CLS = np.loadtxt(prefix + "kitti_07_CLSMarg1.txt")
-Filter = np.loadtxt(prefix + "kitti_07_FilterMarg1.txt")
+CLS = np.loadtxt(prefix + "kitti_07_CLSMarg11.txt")
+Filter = np.loadtxt(prefix + "kitti_07_FilterMarg3.txt")
 
 def findGT(time, gt):
     pos, rota = 0, 0

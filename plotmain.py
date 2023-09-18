@@ -12,7 +12,7 @@ from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.patches import ConnectionPatch
 from matplotlib import ticker
-
+from mpl_toolkits.mplot3d import Axes3D
 
 def RMS(gt, obs):
     rms = np.sqrt(((gt - obs) ** 2).sum() / gt.shape[0])
@@ -638,15 +638,15 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0))
     ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0))
     # ax.set_zlim(0, 10)
-    ax.set_xticks([-50, -30, -10, 10, 30, 50])
-    ax.set_yticks([-50, -30, -10, 10, 30, 50])
-    ax.set_zticks([-50, -30, -10, 10, 30, 50])
+    ax.set_xticks([-15, -10, -5, 0, 5])
+    ax.set_yticks([-12.5, -7.5, -2.5, 2.5, 7.5, 12.5])
+    ax.set_zticks([-2, 0, 2])
     ax.set_xlabel("x (m)", fontdict=font)
     ax.set_ylabel("y (m)", fontdict=font)
     ax.set_zlabel("z (m)", fontdict=font)
 
     ax = plt.gca()
-    # ax.set_aspect(1)
+    ax.set_aspect('equal')
 
     ax.spines['bottom'].set_linewidth(1)
     ax.spines['left'].set_linewidth(1)
@@ -659,10 +659,17 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     # ax.spines['bottom'].set_visible(False)
     # plt.yticks([])
     # plt.xticks([])
-    plt.ylim(-50, 50)
-    plt.xlim(-50, 50)
+    plt.ylim(-12.5, 12.5)
+    plt.xlim(-15, 5)
+    # plt.zlim(-2, 2)
+    # ax.set_zlim(-2, 2)
+    plt.figure(2)
+    plt.plot(trajs[:, 0], trajs[:, 1])
+    ax = plt.gca()
+    ax.set_aspect(1)
 
 
+    # ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([1, 1, 0.5, 1]))
 
     # plt.subplots_adjust(left=0.14, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
     # plt.xlabel("Epoch (sec)", fontdict=font)

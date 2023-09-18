@@ -486,67 +486,66 @@ class CLS:
                 continue
             # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/Cov_prior.txt", self.m_StateCov)
             # 1. search for observations and landmarks
-            self.m_MapPoints = {}
-            self.m_MapPoints_Point = {}
-            self.m_MapPointPos = 0
-            nobs = 0
-            for LocalId, frame in LocalFrames.items():
-                nobs += len(frame.m_features) * 3
-                self.__addFeatures(frame.m_features)
-            StateLandmark = len(self.m_MapPoints) * 3
+            iter = 0
+            prevstate = None
 
-            self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
-            j = 0
-            while True:
-                self.m_StateCov[j: j + 6, j: j + 6] = PoseCov
-                j += 6
+            while iter < 10:
+                self.m_MapPoints = {}
+                self.m_MapPoints_Point = {}
+                self.m_MapPointPos = 0
+                nobs = 0
+                for LocalId, frame in LocalFrames.items():
+                    nobs += len(frame.m_features) * 3
+                    self.__addFeatures(frame.m_features)
+                StateLandmark = len(self.m_MapPoints) * 3
 
-                if j >= StateFrameSize:
+                self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
+                
+                print("process " + str(frame.m_id) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
+                #TODO: 1. solve CLS problem by marginalizing landmark
+                AllStateNum = windowsize * 6 + StateLandmark
+                TotalObsNum = 0
+                B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
+                for LocalID, frame in LocalFrames.items():
+                    # frame_FEJ = self.getFrameFEJ(frame)
+                    tec, Rec = frame.m_pos, frame.m_rota
+                    features = frame.m_features
+                    obsnum = len(features) * 3
+                    J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, LocalID)
+
+                    B[TotalObsNum : TotalObsNum + obsnum, :] = J
+                    L[TotalObsNum : TotalObsNum + obsnum, :] = l
+                    TotalObsNum += obsnum
+
+                NPrior, bPrior = self.premarginalization(windowsize, AllStateNum, StateFrame)
+                Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
+                # print (np.max(bcom))
+
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/NPrior.txt", NPrior)
+                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/bPrior.txt", bPrior)
+                P_obs = np.identity(nobs) * (1.0 / (self.m_PixelStd * self.m_PixelStd))
+
+                N = B.transpose() @ P_obs @ B + NPrior
+                b = B.transpose() @ P_obs @ L + bPrior + bcom
+                state = np.linalg.inv(N) @ b
+                StateFrame = state[: windowsize * 6]
+                self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
+
+                self.marginalization(windowsize, LocalFrames, camera, NPrior, bPrior)
+                # 2. update states. evaluate jacobian at groundtruth, do not update.
+                for j in range(Local):  
+                    LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
+                    LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                StateFrameNum = windowsize * 6
+
+                for id_ in self.m_MapPoints.keys():
+                    position = self.m_MapPoints[id_]
+                    self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
+                
+                if iter >= 1 and np.linalg.norm(prevstate[: windowsize * 6] - state[: windowsize * 6], 2) < 1E-2:
                     break
-            self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
-            tmp = (windowsize - 1) * 6
-            self.m_StateCov[tmp: StateFrameSize, tmp:StateFrameSize] = PoseCov
-            
-            print("process " + str(frame.m_id) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
-            #TODO: 1. solve CLS problem by marginalizing landmark
-            AllStateNum = windowsize * 6 + StateLandmark
-            TotalObsNum = 0
-            B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            for LocalID, frame in LocalFrames.items():
-                # frame_FEJ = self.getFrameFEJ(frame)
-                tec, Rec = frame.m_pos, frame.m_rota
-                features = frame.m_features
-                obsnum = len(features) * 3
-                J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, LocalID)
-
-                B[TotalObsNum : TotalObsNum + obsnum, :] = J
-                L[TotalObsNum : TotalObsNum + obsnum, :] = l
-                TotalObsNum += obsnum
-
-            NPrior, bPrior = self.premarginalization(windowsize, AllStateNum, StateFrame)
-            Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
-            # print (np.max(bcom))
-
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/NPrior.txt", NPrior)
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/bPrior.txt", bPrior)
-            P_obs = np.identity(nobs) * (1.0 / (self.m_PixelStd * self.m_PixelStd))
-
-            N = B.transpose() @ P_obs @ B + NPrior
-            b = B.transpose() @ P_obs @ L + bPrior + bcom
-            state = np.linalg.inv(N) @ b
-            StateFrame = state[: windowsize * 6]
-            self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
-
-            self.marginalization(windowsize, LocalFrames, camera, NPrior, bPrior)
-            # 2. update states. evaluate jacobian at groundtruth, do not update.
-            for j in range(Local):  
-                LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
-                LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-            StateFrameNum = windowsize * 6
-
-            for id_ in self.m_MapPoints.keys():
-                position = self.m_MapPoints[id_]
-                self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
+                prevstate = state
+                iter += 1
 
             # 3. remove old frame and its covariance
             # TODO: marginalization should be applied
@@ -599,6 +598,9 @@ class CLS:
             # B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
             N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
             StateFrame = np.zeros((windowsize_tmp * 6, 1))
+            NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
+            Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
+            
             for LocalID in range(len(frames)):
                 frame = frames[LocalID]
                 tec, Rec = frame.m_pos, frame.m_rota
@@ -618,8 +620,6 @@ class CLS:
             # N = B.transpose() @ R @ B
             # b = B.transpose() @ R @ L
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
-            NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
-            Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
             # if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
             #     N[:6, :6] = N[:6, :6] + np.identity(6) * 1E7 # + np.identity(6) * 1E-7
             # else:
@@ -893,7 +893,7 @@ class CLS:
             del self.m_LandmarkFEJ[item]
 
         PosLandmarkStart = WindowSize * 6
-        ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=120 and index % 3 == 0]
+        ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=WindowSize * 6 and index % 3 == 0]
         LandmarkLocal = {}
         for i in range(len(ConnectedNodes)):
             for mappointID, value in self.m_MapPoints.items():
@@ -1006,23 +1006,55 @@ class CLS:
         else:
             Nmarg, bmarg = self.submarg()
             FrameStateNum = windowsize * 6
-            mapping = {}
+            mapping, IDLocalPos = {}, {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
             for mappointID, GlobalPos in self.m_MapPoints.items():
                 if mappointID in self.m_LandmarkLocal.keys():
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
-            for mappointID in self.m_LandmarkLocal.keys():
-                if mappointID not in self.m_MapPoints.keys():
-                    print("test")
+                    IDLocalPos[mappointID] = LocalPos
+            # mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                     # NPrior_inv[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Dmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                 bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
+            # np.savetxt("./log/NPrior.txt", NPrior)
             
         return NPrior, bPrior #, NPrior_inv, X_return, dX
-        
+
+    def ReposLandmarks(self, mapping, IDLocalPos, windowsize=20):
+        if len(mapping) == 0:
+            return {}
+        mapLocal2Global = dict(sorted(mapping.items(), key=lambda x : (x[1], x[0])))
+        Global2Local = {}
+        StartPos = windowsize * 6
+
+        Gpos, Lpos = mapLocal2Global.keys(), mapLocal2Global.values()
+        Gpos_new = range(StartPos, len(Lpos) * 3 + StartPos, 3)
+
+        # localpos : global pos
+        Global2Local = dict(zip(Lpos, Gpos_new))
+
+        OtherLandmarkStart = Gpos_new[-1] + 3 - StartPos
+        for mappoindID, GlobalPos in self.m_MapPoints.items():
+            if mappoindID in IDLocalPos.keys():
+                self.m_MapPoints[mappoindID] = Global2Local[IDLocalPos[mappoindID]] - StartPos
+            else:
+                self.m_MapPoints[mappoindID] = OtherLandmarkStart
+                OtherLandmarkStart += 3
+
+            MappingOut = {}
+            # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            for mappointID, GlobalPos in self.m_MapPoints.items():
+                if mappointID in self.m_LandmarkLocal.keys():
+                    LocalPos = self.m_LandmarkLocal[mappointID] * 3
+                    MappingOut[GlobalPos + StartPos] = LocalPos
+        MappingOut = dict(sorted(MappingOut.items(), key=lambda x : (x[1], x[0])))
+
+        return MappingOut
+
+
     def submarg(self):
         N_sub, b_sub = self.m_Nmarg, self.m_bmarg
         # check observability of landmarks

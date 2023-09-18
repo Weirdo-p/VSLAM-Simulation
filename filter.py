@@ -720,69 +720,65 @@ class KalmanFilter:
             Local += 1
             if Local < windowsize:
                 continue
+            iter = 0
+            prevstate = None
+            while iter < 10:
+                # 1. search for observations and landmarks
+                self.m_MapPoints = {}
+                self.m_MapPoints_Point = {}
+                self.m_MapPointPos = 0
+                nobs = 0
+                for LocalId, frame in LocalFrames.items():
+                    nobs += len(frame.m_features) * 3
+                    self.__addFeatures(frame.m_features)
+                StateLandmark = len(self.m_MapPoints) * 3
+                print("process " + str(i) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
+                
+                AllStateNum = windowsize * 6 + StateLandmark
+                TotalObsNum = 0
+                self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
 
-            # 1. search for observations and landmarks
-            self.m_MapPoints = {}
-            self.m_MapPoints_Point = {}
-            self.m_MapPointPos = 0
-            nobs = 0
-            for LocalId, frame in LocalFrames.items():
-                nobs += len(frame.m_features) * 3
-                self.__addFeatures(frame.m_features)
-            StateLandmark = len(self.m_MapPoints) * 3
-            print("process " + str(i) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
-            
-            AllStateNum = windowsize * 6 + StateLandmark
-            TotalObsNum = 0
-            self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
-            j = 0
-            while True:
-                self.m_StateCov[j: j + 6, j: j + 6] = PoseCov
-                j += 6
+                # 1. solve CLS problem by marginalizing landmark
+                B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
+                # N_obs, b_obs = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
+                for LocalID, frame in LocalFrames.items():
+                    tec, Rec = frame.m_pos, frame.m_rota
+                    features = frame.m_features
+                    obsnum = len(features) * 3
 
-                if j >= StateFrameSize:
+                    J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, LocalID)
+
+                    B[TotalObsNum : TotalObsNum + obsnum, :] = J
+                    L[TotalObsNum : TotalObsNum + obsnum, :] = l
+                    TotalObsNum += obsnum
+
+
+                NPrior_inv, XPrior = self.CovConstraint(windowsize, AllStateNum)
+                dx = self.compensateFEJ(windowsize)
+                P_obs = np.identity(nobs) * (self.m_PixelStd * self.m_PixelStd)
+                K = NPrior_inv @ B.transpose() @ np.linalg.inv(P_obs + B @ NPrior_inv @ B.transpose())
+                # XPrior = NPrior_inv @ bPrior
+                # print(np,all(np.abs(XPrior1 - XPrior) < 1E-5))
+                state = dx + XPrior + K @ (L - B @ (XPrior + dx))
+                StateFrame = state[: windowsize * 6]
+
+                # update covariance
+                self.UpdateCov(LocalFrames, NPrior_inv, camera, windowsize, XPrior)
+
+                # 2. update states. evaluate jacobian at groundtruth, do not update.
+                for j in range(Local):  
+                    LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
+                    LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                StateFrameNum = windowsize * 6
+
+                for id_ in self.m_MapPoints.keys():
+                    position = self.m_MapPoints[id_]
+                    self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
+                
+                if iter >= 1 and np.linalg.norm(prevstate[: windowsize * 6] - state[: windowsize * 6], 2) < 1E-2:
                     break
-            self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
-            tmp = (windowsize - 1) * 6
-            self.m_StateCov[tmp: StateFrameSize, tmp: StateFrameSize] = PoseCov
-
-            # 1. solve CLS problem by marginalizing landmark
-            B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            # N_obs, b_obs = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
-            for LocalID, frame in LocalFrames.items():
-                tec, Rec = frame.m_pos, frame.m_rota
-                features = frame.m_features
-                obsnum = len(features) * 3
-
-                J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, LocalID)
-
-                B[TotalObsNum : TotalObsNum + obsnum, :] = J
-                L[TotalObsNum : TotalObsNum + obsnum, :] = l
-                TotalObsNum += obsnum
-
-
-            NPrior_inv, XPrior = self.CovConstraint(windowsize, AllStateNum)
-            dx = self.compensateFEJ(windowsize)
-            P_obs = np.identity(nobs) * (self.m_PixelStd * self.m_PixelStd)
-            K = NPrior_inv @ B.transpose() @ np.linalg.inv(P_obs + B @ NPrior_inv @ B.transpose())
-            # XPrior = NPrior_inv @ bPrior
-            # print(np,all(np.abs(XPrior1 - XPrior) < 1E-5))
-            state = dx + XPrior + K @ (L - B @ (XPrior + dx))
-            StateFrame = state[: windowsize * 6]
-
-            # update covariance
-            self.UpdateCov(LocalFrames, NPrior_inv, camera, windowsize, XPrior)
-
-            # 2. update states. evaluate jacobian at groundtruth, do not update.
-            for j in range(Local):  
-                LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
-                LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-            StateFrameNum = windowsize * 6
-
-            for id_ in self.m_MapPoints.keys():
-                position = self.m_MapPoints[id_]
-                self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
-
+                prevstate = state
+                iter += 1
             # 3. remove old frame and its covariance
             for _id in range(Local - 1):
                 LocalFrames_gt[_id] = LocalFrames_gt[_id + 1]
@@ -885,12 +881,14 @@ class KalmanFilter:
         else:
             bmarg, Nmarg = self.submarg_Kitti()
             FrameStateNum = windowsize * 6
-            mapping = {}
+            mapping, IDLocalPos = {}, {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
             for mappointID, GlobalPos in self.m_MapPoints.items():
                 if mappointID in self.m_LandmarkLocal.keys():
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
+                    IDLocalPos[mappointID] = LocalPos
+            # self.ReposLandmarks(mapping, IDLocalPos, windowsize)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
@@ -898,6 +896,13 @@ class KalmanFilter:
                 bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
 
         return bPrior, np.linalg.inv(NPrior) #, NPrior_inv, X_return, dX
+    
+    def ReposLandmarks(self, mapping, IDLocalPos, windowsize=20):
+        mapLocal2Global = sorted(mapping.items(), key=lambda x : x[1])
+
+        print(mapLocal2Global)
+        print(mapping)
+        pass
 
     def marginalization(self, WindowSize, LocalFrame, camera, NPrior, bPrior):
 
@@ -1693,7 +1698,7 @@ class KalmanFilter:
             del self.m_LandmarkFEJ[item]
 
         PosLandmarkStart = windowsize * 6
-        ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=120 and index % 3 == 0]
+        ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(len(HaveValue)) if HaveValue[index] and index >=windowsize * 6 and index % 3 == 0]
         LandmarkLocal = {}
         for i in range(len(ConnectedNodes)):
             for mappointID, value in self.m_MapPoints.items():
