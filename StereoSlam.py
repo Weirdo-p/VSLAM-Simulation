@@ -841,7 +841,7 @@ class StereoSlam:
     def runKittiVIO_FilterMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):
         self.m_map.m_points.clear()
 
-        self.m_ref = np.loadtxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/kitti_07_CLSMarg.txt")
+        # self.m_ref = np.loadtxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/kitti_07_CLSMarg.txt")
         self.m_refi = -1
         FrameNumInWindow = 0
         self.m_lframe = None

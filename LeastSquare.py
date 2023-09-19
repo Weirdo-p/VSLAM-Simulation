@@ -478,6 +478,8 @@ class CLS:
         for i in range(len(frames)):
             if frames[i].m_time > LastTime:
                 break
+            if len(frames[i].m_features) < 4:
+                continue
             LocalFrames[Local] = frames[i]
             LocalFrames_gt[Local] = frames_gt[i]
 
@@ -500,11 +502,12 @@ class CLS:
                 StateLandmark = len(self.m_MapPoints) * 3
 
                 self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
-                
                 print("process " + str(frame.m_id) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
                 #TODO: 1. solve CLS problem by marginalizing landmark
                 AllStateNum = windowsize * 6 + StateLandmark
                 TotalObsNum = 0
+                NPrior, bPrior = self.premarginalization(windowsize, AllStateNum, StateFrame)
+                Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
                 B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
                 for LocalID, frame in LocalFrames.items():
                     # frame_FEJ = self.getFrameFEJ(frame)
@@ -517,8 +520,6 @@ class CLS:
                     L[TotalObsNum : TotalObsNum + obsnum, :] = l
                     TotalObsNum += obsnum
 
-                NPrior, bPrior = self.premarginalization(windowsize, AllStateNum, StateFrame)
-                Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
                 # print (np.max(bcom))
 
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/debug/NPrior.txt", NPrior)
@@ -536,6 +537,7 @@ class CLS:
                 for j in range(Local):  
                     LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
                     LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                    LocalFrames[j].m_rota = UnitRotation(LocalFrames[j].m_rota)
                 StateFrameNum = windowsize * 6
 
                 for id_ in self.m_MapPoints.keys():
@@ -1013,7 +1015,7 @@ class CLS:
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
                     IDLocalPos[mappointID] = LocalPos
-            # mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
+            mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
