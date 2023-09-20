@@ -610,9 +610,6 @@ class CLS:
                 
                 J, P_obs, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
                 obsnum = l.shape[0]
-                # B[TotalObsNum : TotalObsNum + obsnum, :] = J
-                # L[TotalObsNum : TotalObsNum + obsnum, :] = l
-                # R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = P_obs
                 if obsnum <= 9:
                     return -1
                 # print(obsnum)
@@ -622,13 +619,9 @@ class CLS:
             # N = B.transpose() @ R @ B
             # b = B.transpose() @ R @ L
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
-            # if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
-            #     N[:6, :6] = N[:6, :6] + np.identity(6) * 1E7 # + np.identity(6) * 1E-7
-            # else:
-            #     np.savetxt("./debug/NPrior.txt", NPrior)
-            #     np.savetxt("./debug/N.txt", N) + np.identity(N.shape[0]) * 1E-7
-            state = np.linalg.inv(N + NPrior) @ (b + bPrior + bcom)
-            # StateFrame = state[: windowsize_tmp * 6]
+
+            state = self.solveMarg(N + NPrior, b + bPrior + bcom, windowsize)
+            # state = np.linalg.inv(N + NPrior) @ (b + bPrior + bcom)
 
             for j in range(windowsize_tmp):  
                 frames[j].m_pos =  frames[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -649,8 +642,7 @@ class CLS:
 
             if iter >= 1 and np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2) < 1E-2:
                 break
-            # if iter != 9:
-            #     prevstate = state
+            prevstate = state
             iter += 1
         print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
 
@@ -673,6 +665,17 @@ class CLS:
                 obs.m_buse = True
         
         return 1
+
+    def solveMarg(self, N, b, windowsize=20):
+        FrameStateNum = windowsize * 6
+        N11, N12, N22 = N[: FrameStateNum, : FrameStateNum], N[: FrameStateNum, FrameStateNum:], N[FrameStateNum: , FrameStateNum: ]
+        b1, b2 = b[: FrameStateNum, :], b[FrameStateNum:, :]
+        N22_inv, N12_T = np.linalg.inv(N22), N12.transpose()
+
+        xf = np.linalg.inv(N11 - N12 @ N22_inv @ N12_T) @ (b1 - N12 @ N22_inv @ b2)
+        xl = N22_inv @ (b2 - N12_T @ xf)
+
+        return np.append(xf, xl).reshape(-1, 1)
 
     def savestates(self, frames, mappoints):
         self.m_save_frames = copy.deepcopy(frames)
@@ -1015,7 +1018,7 @@ class CLS:
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
                     IDLocalPos[mappointID] = LocalPos
-            mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
+            # mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]

@@ -1359,14 +1359,17 @@ class KalmanFilter:
             AllStateNum = windowsize_tmp * 6 + StateLandmark
             TotalObsNum = 0
             # N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
-            R = np.zeros((nobs, nobs))
-            B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            StateFrame = np.zeros((windowsize_tmp * 6, 1))
+            # R = np.zeros((nobs, nobs))
+            # B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
+            # StateFrame = np.zeros((windowsize_tmp * 6, 1))
 
             bPrior, NPrior_inv = self.CovConstraint_Kitti(windowsize_tmp, AllStateNum)
             # NPrior, bPrior, NPrior_inv = self.premarginalization_CLSTEST(windowsize_tmp, AllStateNum, StateFrame)
             # Ncom, bcom = self.compensateFEJ_CLSTEST(NPrior, windowsize)
+            Covariance = copy.deepcopy(NPrior_inv)
             dx = self.compensateFEJ(windowsize)
+            state = np.zeros((AllStateNum, 1))
+            i_obs = 0
             for LocalID in range(len(frames)):
                 frame = frames[LocalID]
                 tec, Rec = frame.m_pos, frame.m_rota
@@ -1375,12 +1378,22 @@ class KalmanFilter:
                 J, P_obs, l = self.setMEQ_Kitti(tec, Rec, features, camera, windowsize_tmp, LocalID)
                 obsnum = l.shape[0]
 
-                B[TotalObsNum : TotalObsNum + obsnum, :] = J
-                L[TotalObsNum : TotalObsNum + obsnum, :] = l
-                R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = P_obs
+                # B[TotalObsNum : TotalObsNum + obsnum, :] = J
+                # L[TotalObsNum : TotalObsNum + obsnum, :] = l
+                # R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = P_obs
 
                 if obsnum <= 9:
                     return -1
+
+                K = Covariance @ J.transpose() @ np.linalg.inv(np.linalg.inv(P_obs) + J @ Covariance @ J.transpose())
+                if i_obs == 0:
+                    XPrior = Covariance @ bPrior
+                    state = state + dx + XPrior + K @ (l - J @ (XPrior + dx))
+                else:
+                    state = state + K @ (l - J @ state)
+                Covariance = (np.identity(K.shape[0]) - K @ J) @ Covariance
+                i_obs += 1
+
                 # print(obsnum)
                 # N += J.transpose() @ P_obs @ J
                 # b += J.transpose() @ P_obs @ l
@@ -1389,24 +1402,10 @@ class KalmanFilter:
             # b = B.transpose() @ R @ L
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
 
-            # print(np.all(np.abs(NPrior_inv - np.linalg.inv(NPrior)) < 1E-7))
-            # np.savetxt("./log/NPrior.txt", NPrior)
-            # np.savetxt("./log/NPrior_inv.txt", NPrior_inv)
-            # NPrior_inv = np.linalg.inv(NPrior)
-            # dx = NPrior_inv @ bcom
-            # dx = self.compensateFEJ(windowsize_tmp)
-
-            # if len(self.m_LandmarkLocal) or np.all(NPrior == 0):
-            #     N[:6, :6] = N[:6, :6] + np.identity(6) * 1E7 # + np.identity(6) * 1E-7
-            # else:
-            #     np.savetxt("./debug/NPrior.txt", NPrior)
-            #     np.savetxt("./debug/N.txt", N) + np.identity(N.shape[0]) * 1E-7
-            # state = np.linalg.inv(N + NPrior) @ (b + bPrior + bcom)
-
-            K = NPrior_inv @ B.transpose() @ np.linalg.inv(np.linalg.inv(R) + B @ NPrior_inv @ B.transpose())
-            XPrior = NPrior_inv @ bPrior
-            state = dx + XPrior + K @ (L - B @ (XPrior + dx))
-            StateFrame = state[: windowsize_tmp * 6]
+            # K = NPrior_inv @ B.transpose() @ np.linalg.inv(np.linalg.inv(R) + B @ NPrior_inv @ B.transpose())
+            # XPrior = NPrior_inv @ bPrior
+            # state = dx + XPrior + K @ (L - B @ (XPrior + dx))
+            # StateFrame = state[: windowsize_tmp * 6]
 
             for j in range(windowsize_tmp):  
                 frames[j].m_pos =  frames[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -1428,7 +1427,7 @@ class KalmanFilter:
             if iter >= 1 and np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2) < 1E-2:
                 break
             # if iter != 9:
-            #     prevstate = state
+            prevstate = state
             iter += 1
         print(np.linalg.norm(prevstate[: windowsize_tmp * 6] - state[: windowsize_tmp * 6], 2))
 
