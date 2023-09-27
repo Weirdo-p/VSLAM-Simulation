@@ -711,8 +711,9 @@ class CLS:
 
         # chi2 test for outlier remove
         thres = 7.991
-        iter, inlier, outlier = 0, 0, 0
+        iter = 0
         while iter < 5:
+            inlier, outlier = 0, 0
             for key, value in resi_dict.items():
                 if value > thres:
                     outlier += 1
@@ -1018,7 +1019,7 @@ class CLS:
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
                     IDLocalPos[mappointID] = LocalPos
-            # mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
+            mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]

@@ -5,16 +5,19 @@ from camera import *
 import numpy as np
 import sys
 
-path_to_kitti = "/home/xuzhuo/Documents/data/07-kitti/07/KITTI_07/Features/"
+path_to_kitti = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/KITTI_00/Features/"
 path_to_feats = glob.glob(path_to_kitti + "*.txt")
 path_to_feats = sorted(path_to_feats, key=lambda name: float(name[len(path_to_kitti): len(name) - 4]))
 
-result_prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
+result_prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/KITTI_00/"
 path_to_output = result_prefix + "result.txt"
+path_to_campose = glob.glob(result_prefix + "*.txt")[0]
 
 
 kitti_slam = StereoSlam()
 kitti_slam.readFeatureFileXyz(path_to_feats)
+kitti_slam.readCamPose(path_to_campose)
+kitti_slam.plot()
 
 fx = 7.188560000000e+02
 fy = 7.188560000000e+02
@@ -38,5 +41,5 @@ kitti_slam.m_estimator.m_PosStd = PosStd
 kitti_slam.m_estimator.m_AttStd = AttStd
 kitti_slam.m_estimator.m_PointStd = PointStd
 
-kitti_slam.runKittiVIO_CLSMarg(path_to_output, "./")
+kitti_slam.runKittiVIO_FilterMarg(path_to_output, "./")
 # %%

@@ -881,6 +881,7 @@ class KalmanFilter:
             # print(L)
             NPrior = B.transpose() @ P @ B
             bPrior = B.transpose() @ P @ L
+            NPrior_inv[:6, : 6] = np.identity(6) * 1E-8
         else:
             bmarg, Dmarg = self.submarg_Kitti()
             FrameStateNum = windowsize * 6
@@ -1359,7 +1360,7 @@ class KalmanFilter:
             AllStateNum = windowsize_tmp * 6 + StateLandmark
             TotalObsNum = 0
             # N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
-            # R = np.zeros((nobs, nobs))
+            # R, P = np.zeros((nobs, nobs)), np.zeros((nobs, nobs))
             # B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
             # StateFrame = np.zeros((windowsize_tmp * 6, 1))
 
@@ -1381,17 +1382,19 @@ class KalmanFilter:
                 # B[TotalObsNum : TotalObsNum + obsnum, :] = J
                 # L[TotalObsNum : TotalObsNum + obsnum, :] = l
                 # R[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = P_obs
+                # P[TotalObsNum: TotalObsNum + obsnum, TotalObsNum: TotalObsNum + obsnum] = np.linalg.inv(P_obs)
 
                 if obsnum <= 9:
                     return -1
-
-                K = Covariance @ J.transpose() @ np.linalg.inv(np.linalg.inv(P_obs) + J @ Covariance @ J.transpose())
+                D_obs = np.linalg.inv(P_obs)
+                K = Covariance @ J.transpose() @ np.linalg.inv(D_obs + J @ Covariance @ J.transpose())
                 if i_obs == 0:
                     XPrior = Covariance @ bPrior
                     state = state + dx + XPrior + K @ (l - J @ (XPrior + dx))
                 else:
                     state = state + K @ (l - J @ state)
-                Covariance = (np.identity(K.shape[0]) - K @ J) @ Covariance
+                coef = (np.identity(K.shape[0]) - K @ J)
+                Covariance = coef @ Covariance @ coef.transpose() + K @ D_obs @ K.transpose()
                 i_obs += 1
 
                 # print(obsnum)
@@ -1401,7 +1404,7 @@ class KalmanFilter:
             # N = B.transpose() @ R @ B
             # b = B.transpose() @ R @ L
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
-
+            # np.savetxt("./log/P_R.txt", np.linalg.inv(R) - P)
             # K = NPrior_inv @ B.transpose() @ np.linalg.inv(np.linalg.inv(R) + B @ NPrior_inv @ B.transpose())
             # XPrior = NPrior_inv @ bPrior
             # state = dx + XPrior + K @ (L - B @ (XPrior + dx))
@@ -1571,8 +1574,9 @@ class KalmanFilter:
 
         # chi2 test for outlier remove
         thres = 7.991
-        iter, inlier, outlier = 0, 0, 0
+        iter = 0
         while iter < 5:
+            inlier, outlier = 0, 0
             for key, value in resi_dict.items():
                 if value > thres:
                     outlier += 1
@@ -1623,7 +1627,7 @@ class KalmanFilter:
             for obs in point.m_obs:
                 tc, Rc = obs.m_frame.m_pos, obs.m_frame.m_rota
                 point_cam = Rc @ (point.m_pos - tc)
-                if point_cam[2, 0] < 0:
+                if point_cam[2, 0] < 0 or point_cam[2, 0] > 300:
                     point.m_buse = -1
 
             # point.check()

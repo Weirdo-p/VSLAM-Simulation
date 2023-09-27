@@ -9,7 +9,7 @@ posAttributes["ylabel"] = "Error(m)"
 posAttributes["xlabel"] = "Epoch(sec)"
 posAttributes["legend"] = ["R", "F", "U"]
 posAttributes["xlim"] = [0, 0]
-posAttributes["ylim"] = [-1, 1]
+posAttributes["ylim"] = [1, 1]
 posAttributes["scientific"] = False
 
 posSubAtt = {}
@@ -28,7 +28,7 @@ velAttributes["ylabel"] = "Error(m/s)"
 velAttributes["xlabel"] = "Epoch(sec)"
 velAttributes["legend"] = ["R", "F", "U"]
 velAttributes["xlim"] = [0, 300]
-velAttributes["ylim"] = [-0.6, 0.6]
+velAttributes["ylim"] = [0.6, 0.6]
 velAttributes["scientific"] = False
 
 velSubAtt = {}
@@ -49,7 +49,7 @@ attAttributes["ylabel"] = "Error(Deg)"
 attAttributes["xlabel"] = "Epoch(sec)"
 attAttributes["legend"] = ["Y", "P", "R"]
 attAttributes["xlim"] = [0, 70]
-attAttributes["ylim"] = [-1, 1]
+attAttributes["ylim"] = [1, 1]
 attAttributes["scientific"] = True
 
 
@@ -69,7 +69,7 @@ plotAttributes['vel'] = velAttributes
 plotAttributes['att'] = attAttributes
 
 orders = ["pos", "att"]
-prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/"
+prefix = "/home/simon/visual_simulation/kitti/KITTI_00/"
 cmp = "CLS_Filter_1"
 names = [".CLS_Seq", ".CLS"]
 
@@ -96,7 +96,7 @@ names = [".CLS_Seq", ".CLS"]
 # # print(errors[names[0]].reshape(dim1, dim2))
 # time = errors[names[0]][:, 0]
 
-CLS = np.loadtxt(prefix + "kitti_07_CLSMarg11.txt")
+CLS = np.loadtxt(prefix + "result.txtkitti_07_CLSMarg11.txt")
 Filter = np.loadtxt(prefix + "kitti_07_FilterMarg3.txt")
 
 time = CLS[:, 0]

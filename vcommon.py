@@ -248,8 +248,8 @@ class Map:
 
         if (Pj[2, 0] <= 0):
             return False
-        if (Pj[2, 0] >=200):
-            return False
+        # if (Pj[2, 0] >=500):
+        #     return False
         feature.m_PosInCamera = Pj
         
         return True
@@ -444,6 +444,13 @@ def Huber(residual, thres):
     else:
         return np.sqrt(2 * thres * np.abs(residual) - thres ** 2)
 
+def quat2rota(q0, q1, q2, q3):
+    q0_square, q1_square, q2_square, q3_square = q0 ** 2, q1 ** 2, q2 ** 2, q3 ** 2
+    R = np.array([[q0_square + q1_square - q2_square - q3_square, 2 * (q1 * q2 - q0 * q3)                      , 2 * (q1 * q3 + q0 * q2)],
+                  [2 * (q1 * q2 + q0 * q3)                      , q0_square - q1_square + q2_square - q3_square, 2 * (q2 * q3 - q0 * q1)],
+                  [2 * (q1 * q3 - q0 * q2)                      , 2 * (q2 * q3 + q0 * q1)                      , q0_square - q1_square - q2_square + q3_square]]) # .transpose()
+    
+    return R
 
 def UnitRotation(R):
     return R @ fractional_matrix_power((R.transpose() @ R), -0.5)

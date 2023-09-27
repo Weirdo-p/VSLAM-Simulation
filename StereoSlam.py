@@ -88,8 +88,30 @@ class StereoSlam:
                 for feat in features:
                     feat.m_frame = frame
             self.m_frames.append(frame)
-
-
+    
+    def readCamPose(self, Path_to_file):
+        start = 0
+        with open(Path_to_file, "r") as f:
+            while True:
+                line = f.readline()
+                if line:
+                    time, x, y, z, q1, q2, q3, q0 = line.split()
+                    # if float(time) == 10.47264:
+                    #     print("")
+                    for i in range(start, len(self.m_frames)):
+                        if np.abs(self.m_frames[i].m_time - float(time)) < 1E-2: 
+                            frame = self.m_frames[i]
+                            frame.m_pos = np.array([[float(x)], [float(y)], [float(z)]])
+                            frame.m_rota = quat2rota(float(q0), float(q1), float(q2), float(q3))
+                            # start += 1
+                            break
+                else:
+                    break
+        
+        for i in range(start, len(self.m_frames)):
+            if np.linalg.norm(self.m_frames[i].m_pos, 2) == 0:
+                print("test")
+        
     def plot(self):
         path, points = [], []
 
@@ -106,7 +128,8 @@ class StereoSlam:
             pos[2, 0] = a            # tec.reshape(3, -1)
             path.append(pos)
             # print(tec)
-        
+        if len(self.m_map.m_points) == 0:
+            self.m_map.m_points = self.m_GlobMap.m_points
         for id, point in self.m_map.m_points.items():
             pos = point.m_pos - tec0
             pos = (Rec0 @ (pos))
@@ -116,8 +139,8 @@ class StereoSlam:
             pos[2, 0] = a            # tec.reshape(3, -1)
             # pos.reshape(3, -1)
 
-            if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
-                continue
+            # if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
+            #     continue
             points.append(pos)
 
         
@@ -875,7 +898,7 @@ class StereoSlam:
                 self.m_filter.reset()
                 self.m_map.clear()
                 # self.m_map.addNewFrame(frame, self.m_GlobMap)
-                if self.TrackLastFrame() == False:
+                if self.TrackLastFrame(True) == False:
                     self.removeNewFrame()
                     self.m_map.clear()
                     FrameNumInWindow -= 1
@@ -895,7 +918,7 @@ class StereoSlam:
         plt.plot(array[:, 0], array[:, 2])
         plt.show()
 
-        with open("./log/kitti_07_FilterMarg3.txt", "a") as f:
+        with open(path_to_output + "kitti_07_FilterMarg3.txt", "a") as f:
             for frame in self.m_frames:
                 twc, Rwc = frame.m_pos, frame.m_rota
                 att = rot2att(Rwc) * R2D
@@ -936,7 +959,7 @@ class StereoSlam:
                 self.m_estimator.reset()
                 self.m_map.clear()
                 # self.m_map.addNewFrame(frame, self.m_GlobMap)
-                if self.TrackLastFrame() == False:
+                if self.TrackLastFrame(True) == False:
                     self.removeNewFrame()
                     self.m_map.clear()
                     FrameNumInWindow -= 1
@@ -956,7 +979,7 @@ class StereoSlam:
         plt.plot(array[:, 0], array[:, 2])
         plt.show()
 
-        with open("./log/kitti_07_CLSMarg11.txt", "a") as f:
+        with open(path_to_output + "kitti_07_CLSMarg11.txt", "a") as f:
             for frame in self.m_frames:
                 twc, Rwc = frame.m_pos, frame.m_rota
                 att = rot2att(Rwc) * R2D
@@ -1026,10 +1049,11 @@ class StereoSlam:
         plt.pause(0.001)
 
 
-    def TrackLastFrame(self):
+    def TrackLastFrame(self, retrack=False):
         """solve initial value for the latest frame
         """
-
+        if retrack == False:
+            return True
         FrameNum = len(self.m_map.m_frames)
         # if FrameNum <= 1:
         #     return True
@@ -1089,9 +1113,9 @@ class StereoSlam:
             nframe.m_pos = nframe.m_pos - dx[0: 3, :]
             nframe.m_rota = nframe.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[3: 6, :]))
             nframe.m_rota = UnitRotation(nframe.m_rota)
-            if self.removeOutlier(usedLandmarks, nframe):
-                nframe.m_pos = pPwc_copy.copy()
-                nframe.m_rota = pRwc_copy.copy()
+            # if self.removeOutlier(usedLandmarks, nframe):
+            #     nframe.m_pos = pPwc_copy.copy()
+            #     nframe.m_rota = pRwc_copy.copy()
 
         for i in range(len(nframe.m_features)):
             nframe.m_features[i].m_buse = True
