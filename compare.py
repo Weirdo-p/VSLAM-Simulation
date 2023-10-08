@@ -69,7 +69,7 @@ plotAttributes['vel'] = velAttributes
 plotAttributes['att'] = attAttributes
 
 orders = ["pos", "att"]
-prefix = "/home/simon/visual_simulation/kitti/KITTI_00/"
+prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/KITTI_00_1/"
 cmp = "CLS_Filter_1"
 names = [".CLS_Seq", ".CLS"]
 
@@ -97,7 +97,7 @@ names = [".CLS_Seq", ".CLS"]
 # time = errors[names[0]][:, 0]
 
 CLS = np.loadtxt(prefix + "result.txtkitti_07_CLSMarg11.txt")
-Filter = np.loadtxt(prefix + "kitti_07_FilterMarg3.txt")
+Filter = np.loadtxt(prefix + "result.txtkitti_07_FilterMarg3.txt")
 
 time = CLS[:, 0]
 time -= time[0]

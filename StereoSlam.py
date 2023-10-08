@@ -874,7 +874,7 @@ class StereoSlam:
             if FrameNumInWindow < windowsize:
                 self.m_map.addNewFrame(frame, self.m_GlobMap)
                 FrameNumInWindow += 1
-                if (self.TrackLastFrame() == False):
+                if (self.TrackLastFrame(True) == False):
                     #TODO: remove the latest frame and its observations
                     self.removeNewFrame()
                     frame.reset()
@@ -923,6 +923,10 @@ class StereoSlam:
                 twc, Rwc = frame.m_pos, frame.m_rota
                 att = rot2att(Rwc) * R2D
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n".format(frame.m_time, twc[0, 0], twc[1, 0], twc[2, 0], att[0], att[1], att[2]))
+        
+        with open(path_to_output +"kitti_07_FilterPoints.txt", "a") as f:
+            for id, point in self.m_GlobMap.m_points.items():
+                f.write("{0}\t{1}\t{2}\t{3}\n".format(id, point.m_pos[0, 0], point.m_pos[1, 0], point.m_pos[2, 0]))
 
 
     def runKittiVIO_CLSMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):
@@ -935,7 +939,7 @@ class StereoSlam:
             if FrameNumInWindow < windowsize:
                 self.m_map.addNewFrame(frame, self.m_GlobMap)
                 FrameNumInWindow += 1
-                if (self.TrackLastFrame() == False):
+                if (self.TrackLastFrame(True) == False):
                     #TODO: remove the latest frame and its observations
                     self.removeNewFrame()
                     frame.reset()
@@ -984,6 +988,10 @@ class StereoSlam:
                 twc, Rwc = frame.m_pos, frame.m_rota
                 att = rot2att(Rwc) * R2D
                 f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n".format(frame.m_time, twc[0, 0], twc[1, 0], twc[2, 0], att[0], att[1], att[2]))
+
+        with open(path_to_output +"kitti_07_CLSPoints.txt", "a") as f:
+            for id, point in self.m_GlobMap.m_points.items():
+                f.write("{0}\t{1}\t{2}\t{3}\n".format(id, point.m_pos[0, 0], point.m_pos[1, 0], point.m_pos[2, 0]))
 
 
 

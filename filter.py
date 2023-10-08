@@ -59,6 +59,12 @@ class KalmanFilter:
         self.m_estimateFrame = []
         self.m_Nmarg = np.zeros((0, 0))
         self.m_bmarg = np.zeros((0, 0))
+        self.m_Jmarg = np.zeros((0, 0))
+        self.m_lmarg = np.zeros((0, 0))
+        self.m_Npmarg = np.zeros((0, 0))
+        self.m_bpmarg = np.zeros((0, 0))
+        self.m_Xpmarg = np.zeros((0, 0))
+        self.m_Pobsmarg = np.zeros((0, 0))
         self.m_LandmarkLocal = {}
         
 
@@ -869,19 +875,21 @@ class KalmanFilter:
             if j >= StateFrameSize:
                 break
         NPrior_inv[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
-        NPrior = np.linalg.inv(NPrior_inv)
+        # NPrior = np.linalg.inv(NPrior_inv)
 
         if len(self.m_LandmarkLocal) == 0:
-            B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
-            P = np.zeros((StateNum, StateNum))
-            B = np.identity(StateNum)
-            P = NPrior
+            # B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            # P = np.zeros((StateNum, StateNum))
+            # B = np.identity(StateNum)
+            # NPrior = np.linalg.inv(NPrior_inv)
 
-            L[: windowsize * 6, :] = 0 
-            # print(L)
-            NPrior = B.transpose() @ P @ B
-            bPrior = B.transpose() @ P @ L
-            NPrior_inv[:6, : 6] = np.identity(6) * 1E-8
+            # P = NPrior
+
+            # L[: windowsize * 6, :] = 0 
+            # # print(L)
+            # NPrior = B.transpose() @ P @ B
+            # bPrior = B.transpose() @ P @ L
+            NPrior_inv[:6, : 6] = np.identity(6) * 1E-4
         else:
             bmarg, Dmarg = self.submarg_Kitti()
             FrameStateNum = windowsize * 6
@@ -1202,10 +1210,13 @@ class KalmanFilter:
         
         # P_obs = np.identity(J.shape[0]) * ( 1.0 / (self.m_PixelStd * self.m_PixelStd))
         NPrior_inv = np.linalg.inv(Np)
+        D_obs = np.linalg.inv(P_obs)
+        K = NPrior_inv @ J.transpose() @ np.linalg.inv(D_obs + J @ NPrior_inv @ J.transpose())
         # NPrior_inv = np.linalg.inv(Np + J.transpose() @ P_obs @ J)
+        coef = (np.identity(K.shape[0]) - K @ J)
+        Dmarg = coef @ NPrior_inv @ coef.transpose() + K @ D_obs @ K.transpose()
 
-        K = NPrior_inv @ J.transpose() @ np.linalg.inv(np.linalg.inv(P_obs) + J @ NPrior_inv @ J.transpose())
-        Dmarg = (np.identity(K.shape[0]) - K @ J) @ NPrior_inv
+        # Dmarg = (np.identity(K.shape[0]) - K @ J) @ NPrior_inv
 
         # b
         N_sub, b_sub = J.transpose() @ P_obs @ J + Np, J.transpose() @ P_obs @ l + bp
@@ -1448,7 +1459,7 @@ class KalmanFilter:
             # if len(point.m_obs) > 4:
             #     point.m_buse = 1
                 # continue
-            # point.m_buse = True
+            # point.m_buse = 1
             count += 1
             for obs in point.m_obs:
                 obs.m_buse = True

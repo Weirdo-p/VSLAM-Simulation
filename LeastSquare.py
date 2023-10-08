@@ -764,7 +764,7 @@ class CLS:
             for obs in point.m_obs:
                 tc, Rc = obs.m_frame.m_pos, obs.m_frame.m_rota
                 point_cam = Rc @ (point.m_pos - tc)
-                if point_cam[2, 0] < 0:
+                if point_cam[2, 0] < 0 or point_cam[2, 0] > 300:
                     point.m_buse = -1
 
             # point.check()
@@ -1006,7 +1006,8 @@ class CLS:
 
             L[: windowsize * 6, :] = 0 
             # print(L)
-            NPrior = B.transpose() @ P @ B
+            NPrior = B.transpose() @ P @ B # + np.identity(6) * 1E8
+            NPrior[:6, :6] = np.identity(6) * 1E7
             bPrior = B.transpose() @ P @ L
             # NPrior_inv = self.m_StateCov.copy()
         else:

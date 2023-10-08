@@ -5,19 +5,19 @@ from camera import *
 import numpy as np
 import sys
 
-path_to_kitti = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/KITTI_00/Features/"
+path_to_kitti = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/KITTI_00_1/Features/"
 path_to_feats = glob.glob(path_to_kitti + "*.txt")
 path_to_feats = sorted(path_to_feats, key=lambda name: float(name[len(path_to_kitti): len(name) - 4]))
 
-result_prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/KITTI_00/"
+result_prefix = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/KITTI_00_1/"
 path_to_output = result_prefix + "result.txt"
-path_to_campose = glob.glob(result_prefix + "*.txt")[0]
+path_to_campose = result_prefix + "CameraTrajectory.txt"
 
 
 kitti_slam = StereoSlam()
 kitti_slam.readFeatureFileXyz(path_to_feats)
 kitti_slam.readCamPose(path_to_campose)
-kitti_slam.plot()
+# kitti_slam.plot()
 
 fx = 7.188560000000e+02
 fy = 7.188560000000e+02
