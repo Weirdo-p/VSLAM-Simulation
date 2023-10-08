@@ -501,7 +501,7 @@ class CLS:
                     self.__addFeatures(frame.m_features)
                 StateLandmark = len(self.m_MapPoints) * 3
 
-                self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
+                # self.m_StateCov = np.zeros((StateFrameSize + StateLandmark, StateFrameSize + StateLandmark))
                 print("process " + str(frame.m_id) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
                 #TODO: 1. solve CLS problem by marginalizing landmark
                 AllStateNum = windowsize * 6 + StateLandmark
@@ -530,9 +530,8 @@ class CLS:
                 b = B.transpose() @ P_obs @ L + bPrior + bcom
                 state = np.linalg.inv(N) @ b
                 StateFrame = state[: windowsize * 6]
-                self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
+                # self.m_StateCov = np.linalg.inv(N)[: windowsize * 6, : windowsize * 6]
 
-                self.marginalization(windowsize, LocalFrames, camera, NPrior, bPrior)
                 # 2. update states. evaluate jacobian at groundtruth, do not update.
                 for j in range(Local):  
                     LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
@@ -548,19 +547,20 @@ class CLS:
                     break
                 prevstate = state
                 iter += 1
-
+                
+            self.marginalization(windowsize, LocalFrames, camera, NPrior, bPrior)
             # 3. remove old frame and its covariance
             # TODO: marginalization should be applied
             for _id in range(Local - 1):
                 LocalFrames_gt[_id] = LocalFrames_gt[_id + 1]
                 LocalFrames[_id] = LocalFrames[_id + 1]
-            tmp = (windowsize - 1) * 6
-            self.m_StateCov[: tmp, : tmp] = self.m_StateCov[6: , 6: ]
-            self.m_StateCov[tmp:, :] = 0
-            self.m_StateCov[:, tmp: ] = 0
+            # tmp = (windowsize - 1) * 6
+            # self.m_StateCov[: tmp, : tmp] = self.m_StateCov[6: , 6: ]
+            # self.m_StateCov[tmp:, :] = 0
+            # self.m_StateCov[:, tmp: ] = 0
             Local -= 1
-            StateFrame[: tmp, :] = StateFrame[6:, :]
-            StateFrame[tmp:, :] = 0
+            # StateFrame[: tmp, :] = StateFrame[6:, :]
+            # StateFrame[tmp:, :] = 0
         return frames
 
     def solveKitti(self, map, camera, windowsize=20):
@@ -1007,7 +1007,7 @@ class CLS:
             L[: windowsize * 6, :] = 0 
             # print(L)
             NPrior = B.transpose() @ P @ B # + np.identity(6) * 1E8
-            NPrior[:6, :6] = np.identity(6) * 1E7
+            NPrior[:6, :6] = np.identity(6) * 1E4
             bPrior = B.transpose() @ P @ L
             # NPrior_inv = self.m_StateCov.copy()
         else:
