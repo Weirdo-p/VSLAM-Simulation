@@ -19,6 +19,7 @@ class CLS:
         self.m_LandmarkLocal = {}
         self.m_FrameFEJ = {}
         self.m_LandmarkFEJ = {}
+        self.m_PrevFrame = Frame()
     
     def reset(self):
         self.m_MapPoints = {}       # position of mappoint in state vector
@@ -478,7 +479,7 @@ class CLS:
         for i in range(len(frames)):
             if frames[i].m_time > LastTime:
                 break
-            if len(frames[i].m_features) < 4:
+            if len(frames[i].m_features) < 5:
                 continue
             LocalFrames[Local] = frames[i]
             LocalFrames_gt[Local] = frames_gt[i]
@@ -536,7 +537,7 @@ class CLS:
                 for j in range(Local):  
                     LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
                     LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-                    LocalFrames[j].m_rota = UnitRotation(LocalFrames[j].m_rota)
+                    # LocalFrames[j].m_rota = UnitRotation(LocalFrames[j].m_rota)
                 StateFrameNum = windowsize * 6
 
                 for id_ in self.m_MapPoints.keys():
@@ -547,13 +548,15 @@ class CLS:
                     break
                 prevstate = state
                 iter += 1
-                
+
+            self.m_PrevFrame = LocalFrames[0]
             self.marginalization(windowsize, LocalFrames, camera, NPrior, bPrior)
             # 3. remove old frame and its covariance
             # TODO: marginalization should be applied
             for _id in range(Local - 1):
                 LocalFrames_gt[_id] = LocalFrames_gt[_id + 1]
                 LocalFrames[_id] = LocalFrames[_id + 1]
+                
             # tmp = (windowsize - 1) * 6
             # self.m_StateCov[: tmp, : tmp] = self.m_StateCov[6: , 6: ]
             # self.m_StateCov[tmp:, :] = 0
@@ -1099,7 +1102,7 @@ class CLS:
         N11_inv = np.linalg.inv(N11)
         Nmarg = N22 - N12_T @ N11_inv @ N12
         bmarg = b2 - N12_T @ N11_inv @ b1
-
+        self.m_PrevFrame.m_cov = np.linalg.inv(N_sub)[:6, :6]
         self.m_Nmarg, self.m_bmarg = N_sub, b_sub
         return Nmarg, bmarg
 

@@ -731,11 +731,11 @@ class StereoSlam:
                         att[0] += 180
                     attError = att - att_gt
                     print(att, att_gt)
-
+                cov = frame_estimate.m_cov
                 position = firstRec @ (frame_estimate.m_pos - firstTec)
                 gt_position = firstRec @ (frame.m_pos - firstTec)
                 frame_i += 1
-                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5]))
 
     def runVIOWithoutError_Filter_SW(self, path_to_output, frames_gt, windowsize = 20, maxtime=-1, bNoiseData = False, iteration=1):
         frames_estimate = self.m_filter.solveSW(self.m_frames, frames_gt, self.m_camera, windowsize, maxtime, iteration)
@@ -855,10 +855,11 @@ class StereoSlam:
                     attError = att - att_gt
                     print(att, att_gt)
 
+                cov = frame_estimate.m_cov
                 position = firstRec @ (frame_estimate.m_pos - firstTec)
                 gt_position = firstRec @ (frame.m_pos - firstTec)
                 frame_i += 1
-                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5]))
 
 
     def runKittiVIO_FilterMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):

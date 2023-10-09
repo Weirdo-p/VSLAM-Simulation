@@ -24,6 +24,8 @@ class Frame:
         self.m_id        =  id
         self.m_features  =  []                   # features
         self.m_time      = 0
+        self.m_cov       = np.identity(6)        # posteriori 
+        self.m_nees      = 0                     # quantity used for consistency
 
     def __deepcopy__(self, memo):
         if self in memo:

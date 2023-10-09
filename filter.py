@@ -50,7 +50,7 @@ class KalmanFilter:
         self.m_LandmarkLocal = {}
         self.m_FrameFEJ = {}
         self.m_LandmarkFEJ = {}
-        
+        self.m_PrevFrame = Frame()
 
     def reset(self):
         self.m_MapPoints = {}       # position of mappoint in state vector
@@ -720,7 +720,7 @@ class KalmanFilter:
         for i in range(len(frames)):
             if frames[i].m_time > LastTime:
                 break
-            if len(frames[i].m_features) < 4:
+            if len(frames[i].m_features) < 5:
                 continue
             LocalFrames[Local] = frames[i]
             LocalFrames_gt[Local] = frames_gt[i]
@@ -780,7 +780,7 @@ class KalmanFilter:
                 for j in range(Local):  
                     LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
                     LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-                    LocalFrames[j].m_rota = UnitRotation(LocalFrames[j].m_rota)
+                    # LocalFrames[j].m_rota = UnitRotation(LocalFrames[j].m_rota)
                 StateFrameNum = windowsize * 6
 
                 for id_ in self.m_MapPoints.keys():
@@ -793,6 +793,7 @@ class KalmanFilter:
                 iter += 1
             # 3. remove old frame and its covariance
             # update covariance
+            self.m_PrevFrame = LocalFrames[0]
             self.UpdateCov(LocalFrames, NPrior_inv, camera, windowsize, np.linalg.inv(NPrior_inv) @ XPrior)
 
             for _id in range(Local - 1):
@@ -1176,7 +1177,7 @@ class KalmanFilter:
         Xp = NPrior_inv @ bp
         dx = Xp + K @ (l - J @ Xp)
         self.m_Jmarg, self.m_lmarg, self.m_Npmarg, self.m_bpmarg = J, l, Np, bp
-
+        self.m_PrevFrame.m_cov = Dmarg[:6, :6]
         return Dmarg[6:, 6: ], dx[6:, :]
 
 
