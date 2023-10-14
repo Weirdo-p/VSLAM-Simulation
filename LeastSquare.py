@@ -244,13 +244,13 @@ class CLS:
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_FILTER_" + str(i) + ".txt", l)
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/W_FILTER_" + str(i) + ".txt", W)
                 print("Process " + str(i) + "th frame")
-                N = J.transpose() @ W @ J + self.m_StateCov
-                w = J.transpose() @ W @ l + self.m_StateCov @ state
+                N += J.transpose() @ W @ J #+ self.m_StateCov
+                w += J.transpose() @ W @ l #+ self.m_StateCov @ state
 
-                self.m_StateCov = N
-                # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV_CLS.txt", np.linalg.inv(self.m_StateCov))
-                state = np.linalg.inv(N ) @ w
-                # break
+            # self.m_StateCov = N
+            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV_CLS.txt", np.linalg.inv(self.m_StateCov))
+            state = np.linalg.inv(N + self.m_StateCov) @ w
+            # break
             # update current frame
             # FramedX = state[i * 6: i * 6 + 6, :]
             # self.m_estimateFrame[i].m_pos = self.m_estimateFrame[i].m_pos - FramedX[0: 3]
@@ -265,6 +265,7 @@ class CLS:
             for j in range(len(self.m_estimateFrame)):  
                 self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
                 self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                self.m_estimateFrame[j].m_rota = UnitRotation(self.m_estimateFrame[j].m_rota)
 
             for id_ in self.m_MapPoints.keys():
 

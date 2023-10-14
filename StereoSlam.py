@@ -440,9 +440,9 @@ class StereoSlam:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time
 
         if bNoiseData:
-            output = path_to_output + "."+str(maxtime)+"s.FilterAllState.Noise"
+            output = path_to_output + "."+str(iteration)+"s.FilterAllState.Noise"
         else:
-            output = path_to_output + "."+str(maxtime)+"s.FilterAllState"
+            output = path_to_output + "."+str(iteration)+"s.FilterAllState"
 
         f = open(output, "w")
         f.close()
@@ -488,10 +488,16 @@ class StereoSlam:
                     attError = att - att_gt
                     print(att, att_gt)
 
+                cov = frame_estimate.m_cov
+                error = np.append(posError, attError * D2R).reshape(-1, 1)
+                if np.linalg.norm(error, 2) == 0:
+                    continue
+                error = normalization(error)
+                nees = (error.transpose() @ cov @ error)[0, 0]
                 position = firstRec @ (frame_estimate.m_pos - firstTec)
                 gt_position = firstRec @ (frame.m_pos - firstTec)
                 frame_i += 1
-                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\t{19}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5], nees))
 
     def runVIOWithoutError_CLS_Sequential(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False, iteration=1):
         frames_estimate = self.m_estimator.solveSequential(self.m_frames, self.m_camera, maxtime, iteration)
@@ -500,9 +506,9 @@ class StereoSlam:
             LastTime = self.m_frames[len(self.m_frames) - 1].m_time
 
         if bNoiseData:
-            output = path_to_output + "."+str(maxtime)+"s.CLS_Seq.Noise"
+            output = path_to_output + "."+str(iteration)+"s.CLS_Seq.Noise"
         else:
-            output = path_to_output + "."+str(maxtime)+"s.CLS_Seq"
+            output = path_to_output + "."+str(iteration)+"s.CLS_Seq"
 
         f = open(output, "w")
         f.close()
@@ -548,10 +554,16 @@ class StereoSlam:
                     attError = att - att_gt
                     print(att, att_gt)
 
+                cov = frame_estimate.m_cov
+                error = np.append(posError, attError * D2R).reshape(-1, 1)
+                if np.linalg.norm(error, 2) == 0:
+                    continue
+                error = normalization(error)
+                nees = (error.transpose() @ cov @ error)[0, 0]
                 position = firstRec @ (frame_estimate.m_pos - firstTec)
                 gt_position = firstRec @ (frame.m_pos - firstTec)
                 frame_i += 1
-                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0]))
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\t{19}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5], nees))
 
     def runVIOWithoutError_FilterAllState_Window(self, path_to_output, frames_gt, maxtime=-1, bNoiseData = False):
         frames_estimate = self.m_filter.filter_AllState_Window(self.m_frames, self.m_camera, frames_gt, maxtime)
@@ -732,10 +744,15 @@ class StereoSlam:
                     attError = att - att_gt
                     print(att, att_gt)
                 cov = frame_estimate.m_cov
+                error = np.append(posError, attError * D2R).reshape(-1, 1)
+                if np.linalg.norm(error, 2) == 0:
+                    continue
+                error = normalization(error)
+                nees = (error.transpose() @ cov @ error)[0, 0]
                 position = firstRec @ (frame_estimate.m_pos - firstTec)
                 gt_position = firstRec @ (frame.m_pos - firstTec)
                 frame_i += 1
-                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5]))
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\t{19}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5], nees))
 
     def runVIOWithoutError_Filter_SW(self, path_to_output, frames_gt, windowsize = 20, maxtime=-1, bNoiseData = False, iteration=1):
         frames_estimate = self.m_filter.solveSW(self.m_frames, frames_gt, self.m_camera, windowsize, maxtime, iteration)
@@ -856,10 +873,15 @@ class StereoSlam:
                     print(att, att_gt)
 
                 cov = frame_estimate.m_cov
+                error = np.append(posError, attError * D2R).reshape(-1, 1)
+                if np.linalg.norm(error, 2) == 0:
+                    continue
+                error = normalization(error)
+                nees = (error.transpose() @ cov @ error)[0, 0]
                 position = firstRec @ (frame_estimate.m_pos - firstTec)
                 gt_position = firstRec @ (frame.m_pos - firstTec)
                 frame_i += 1
-                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5]))
+                f.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18}\t{19}\n".format(frame.m_time, posError[0, 0], posError[1, 0], posError[2, 0], attError[0], attError[1], attError[2], position[0, 0], position[1, 0], position[2, 0], gt_position[0, 0], gt_position[1, 0], gt_position[2, 0], cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5], nees))
 
 
     def runKittiVIO_FilterMarg(self, path_to_output, path_gt, windowsize=10, iteration=1):

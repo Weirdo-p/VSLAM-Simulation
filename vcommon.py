@@ -25,7 +25,8 @@ class Frame:
         self.m_features  =  []                   # features
         self.m_time      = 0
         self.m_cov       = np.identity(6)        # posteriori 
-        self.m_nees      = 0                     # quantity used for consistency
+        self.m_nees      = 0                     # quantity used for consistency\
+        self.m_buse      = True
 
     def __deepcopy__(self, memo):
         if self in memo:
@@ -52,6 +53,12 @@ class Frame:
         for feat in self.m_features:
             feat.m_buse = True
             feat.m_mappoint.m_buse = True
+
+    def setNotUse(self):
+        self.m_buse = False
+        for feat in self.m_features:
+            feat.m_buse = False
+            # feat.m_mappoint.m_buse = True
 
 class Feature:
     def __init__(self, pos = np.zeros([3, 1]), du = 0, mapPointId = -1):
@@ -456,3 +463,7 @@ def quat2rota(q0, q1, q2, q3):
 
 def UnitRotation(R):
     return R @ fractional_matrix_power((R.transpose() @ R), -0.5)
+
+def normalization(data):
+    _min, _max = np.min(data), np.max(data)
+    return (data - _min) / (_max - _min)
