@@ -716,22 +716,169 @@ class KalmanFilter:
             tmp = (windowsize - 1) * 6
             if self.m_StateCov.shape[0] != 0:
                 self.m_StateCov[tmp: tmp + 6, tmp: tmp + 6 ] = PoseCov
+            iter = 0
+            while iter < 10:
+                # 1. search for observations and landmarks
+                self.m_MapPoints = {}
+                self.m_MapPoints_Point = {}
+                self.m_MapPointPos = 0
+                nobs = 0
+                for LocalId, frame in LocalFrames.items():
+                    if frame.m_buse == False:
+                        continue
+                    nobs += len(frame.m_features) * 3
+                    self.__addFeatures(frame.m_features)
+                StateLandmark = len(self.m_MapPoints) * 3
+                print("process " + str(i) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
 
-            # 1. search for observations and landmarks
-            self.m_MapPoints = {}
-            self.m_MapPoints_Point = {}
-            self.m_MapPointPos = 0
-            nobs = 0
+                #TODO: 1. solve CLS problem by marginalizing landmark
+                AllStateNum = windowsize * 6 + StateLandmark
+                
+                # if self.m_StateCov.shape[0] == 0:
+
+                #     # self.m_StateCov[tmp: tmp + 6, tmp: tmp + 6 ] = PoseCov
+
+                #     self.m_StateCov = np.zeros((AllStateNum, AllStateNum))
+
+                #     i_cov = 0
+                #     while True:
+                #         self.m_StateCov[i_cov: i_cov + 6, i_cov: i_cov + 6] = PoseCov
+                #         i_cov += 6
+
+                #         if i_cov >= StateFrameSize:
+                #             break
+                #     self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+                # else:
+                #     tmp_cov = self.m_StateCov.copy()
+                #     self.m_StateCov = np.zeros((AllStateNum, AllStateNum))
+                #     self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+                #     self.m_StateCov[: StateFrameSize, : StateFrameSize] = tmp_cov
+                self.constraint(windowsize, AllStateNum)
+                TotalObsNum = 0
+                N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
+                # B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
+                for LocalID, frame in LocalFrames.items():
+                    if frame.m_buse == False:
+                        continue
+                    tec, Rec = frame.m_pos, frame.m_rota
+                    features = frame.m_features
+                    obsnum = len(features) * 3
+                    J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, LocalID)
+                    P_obs = np.identity(J.shape[0]) * (1.0 / (self.m_PixelStd * self.m_PixelStd))
+                    N += J.transpose() @ P_obs @ J
+                    b += J.transpose() @ P_obs @ l
+
+                    # B[TotalObsNum : TotalObsNum + obsnum, :] = J
+                    # L[TotalObsNum : TotalObsNum + obsnum, :] = l
+                    TotalObsNum += obsnum
+                N[: windowsize * 6, : windowsize * 6]
+                N_inv = np.linalg.inv(N + np.linalg.inv(self.m_StateCov))
+                state = N_inv @ b
+                self.m_StateCov = N_inv
+                # B_all, L_all = np.zeros((nobs + windowsize * 6, AllStateNum)), np.zeros((nobs + windowsize * 6, 1))
+                # P_all = np.zeros((windowsize * 6 + nobs, windowsize * 6 + nobs))
+
+                # # prior part
+                # B_all[: windowsize * 6, :windowsize * 6] = np.identity(windowsize * 6)
+                # P_all[: windowsize * 6, :windowsize * 6] = self.m_StateCov
+                # L_all[: windowsize * 6, :] = StateFrame #WARNING: bugs may remain if not rectifying errors
+
+                # # observation part
+                # B_all[windowsize * 6:, ] = B
+                # P_all[windowsize * 6:, windowsize * 6: ] = np.identity(nobs) * self.m_PixelStd * self.m_PixelStd
+                # L_all[windowsize * 6:, ] = L
+                # P_all = np.linalg.inv(P_all)
+
+                # N = B_all.transpose() @ P_all @ B_all
+                # b = B_all.transpose() @ P_all @ L_all
+
+                # N11 = N[: windowsize * 6, : windowsize * 6]
+                # N12 = N[: windowsize * 6, windowsize * 6: ]
+                # N22 = N[windowsize * 6: , windowsize * 6: ]
+                # b1  = b[: windowsize * 6, : ]
+                # b2  = b[windowsize * 6: , : ]
+                # N22_inv = np.linalg.inv(N22)
+
+
+                # self.m_StateCov = np.linalg.inv(N11 - N12 @ N22_inv @ N12.transpose())
+                # state = np.linalg.inv(N11 - N12 @ N22_inv @ N12.transpose()) @ (b1 - N12 @ N22_inv @ b2)
+                # StateFrame = state[:, :]
+                # print(state)
+
+
+                # 2. update states. evaluate jacobian at groundtruth, do not update.
+                for j in range(Local):  
+                    LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
+                    LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
+                    # LocalFrames[j].m_rota = UnitRotation(LocalFrames[j].m_rota)
+
+                for id_ in self.m_MapPoints.keys():
+                    position = self.m_MapPoints[id_]
+                    self.m_MapPoints_Point[id_].m_pos -= state[StateFrameSize + position : StateFrameSize + position + 3]
+
+                if iter >= 1 and np.linalg.norm(prevstate[: windowsize * 6] - state[: windowsize * 6], 2) < 1E-2:
+                    break
+                # if iter != 9:
+                prevstate = state.copy()
+                iter += 1
+            self.passcov(LocalFrames, N_inv, windowsize)
+
+            # 3. remove old frame and its covariance
+            for _id in range(Local - 1):
+                LocalFrames_gt[_id] = LocalFrames_gt[_id + 1]
+                LocalFrames[_id] = LocalFrames[_id + 1]
+            tmp = (windowsize - 1) * 6
+            # self.m_StateCov[: tmp, : tmp] = self.m_StateCov[6: , 6: ]
+            # self.m_StateCov[tmp: tmp + 6, :] = 0
+            # self.m_StateCov[:, tmp: tmp + 6] = 0
+            Local -= 1
+            StateFrame[: tmp, :] = StateFrame[6:, :]
+            StateFrame[tmp:, :] = 0
             for LocalId, frame in LocalFrames.items():
-                nobs += len(frame.m_features) * 3
-                self.__addFeatures(frame.m_features)
-            StateLandmark = len(self.m_MapPoints) * 3
-            print("process " + str(i) + "th frame. Landmark: " + str(len(self.m_MapPoints)) + ", observation num: " + str(nobs / 3) + ", Local frame size: " + str(len(LocalFrames)))
+                frame.setNotUse()
+            # print(StateFrame)
+        return frames
+    
+    def passcov(self, LocalFrames, NPrior_inv, windowsize):
 
-            #TODO: 1. solve CLS problem by marginalizing landmark
-            AllStateNum = windowsize * 6 + StateLandmark
+        PosLandmarkStart = windowsize * 6
+        ConnectedNodes = [int((index - PosLandmarkStart) / 3)  for index in range(NPrior_inv.shape[0]) if NPrior_inv[index, index] and index >=windowsize * 6 and index % 3 == 0]
+        LandmarkLocal = {}
+        for i in range(len(ConnectedNodes)):
+            for mappointID, value in self.m_MapPoints.items():
+                if ConnectedNodes[i] * 3 == value:
+                    LandmarkLocal[mappointID] = i
+                    # fix linearization point
+                    if mappointID not in self.m_LandmarkFEJ.keys():
+                        self.m_LandmarkFEJ[mappointID] = copy.deepcopy(self.m_MapPoints_Point[mappointID].m_pos)
+                    break
+        tmp = (windowsize - 1) * 6
+        NPrior_inv[: tmp, : tmp] = self.m_StateCov[6: windowsize * 6, 6: windowsize * 6 ]
+        NPrior_inv[tmp: tmp + 6, :] = 0
+        NPrior_inv[:, tmp: tmp + 6] = 0
 
-            self.m_StateCov = np.zeros((AllStateNum, AllStateNum))
+        self.m_LandmarkLocal = LandmarkLocal
+        self.m_Npmarg = NPrior_inv
+        self.m_StateCov = NPrior_inv
+    
+    def constraint(self, windowsize, StateNum):
+        StateFrameSize = windowsize * 6
+        StateLandmark = len(self.m_MapPoints) * 3
+
+        NPrior, NPrior_inv, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+        state_prior = np.zeros((StateNum, 1))
+        # set diagnoal to micro-value
+        mapping = {}
+        PoseCov = np.identity(6)
+        PoseCov[:3, :3] *= (self.m_PosStd ** 2)
+        PoseCov[3:, 3:] *= (self.m_AttStd ** 2)
+
+
+        if self.m_StateCov.shape[0] == 0:
+
+            # self.m_StateCov[tmp: tmp + 6, tmp: tmp + 6 ] = PoseCov
+
+            self.m_StateCov = np.zeros((StateNum, StateNum))
 
             i_cov = 0
             while True:
@@ -741,84 +888,33 @@ class KalmanFilter:
                 if i_cov >= StateFrameSize:
                     break
             self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+        else:
+            tmp_cov = self.m_StateCov.copy()
+            self.m_StateCov = np.zeros((StateNum, StateNum))
+            self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
+            self.m_StateCov[: StateFrameSize, : StateFrameSize] = tmp_cov[: StateFrameSize, : StateFrameSize]
 
+        if len(self.m_LandmarkLocal) != 0:
 
-            TotalObsNum = 0
-            N, b = np.zeros((AllStateNum, AllStateNum)), np.zeros((AllStateNum, 1))
-            # B, L = np.zeros((nobs, AllStateNum)), np.zeros((nobs, 1))
-            for LocalID, frame in LocalFrames.items():
-                if frame.m_buse == False:
-                    continue
-                tec, Rec = frame.m_pos, frame.m_rota
-                features = frame.m_features
-                obsnum = len(features) * 3
-                J, l = self.setMEQ_SW(tec, Rec, features, camera, windowsize, LocalID)
-                P_obs = np.identity(J.shape[0]) * (1.0 / (self.m_PixelStd * self.m_PixelStd))
-                N += J.transpose() @ P_obs @ J
-                b += J.transpose() @ P_obs @ l
-
-                # B[TotalObsNum : TotalObsNum + obsnum, :] = J
-                # L[TotalObsNum : TotalObsNum + obsnum, :] = l
-                TotalObsNum += obsnum
-            N[: windowsize * 6, : windowsize * 6]
-            N_inv = np.linalg.inv(N + np.linalg.inv(self.m_StateCov))
-            state = N_inv @ b
-            self.m_StateCov = N_inv[: windowsize * 6, : windowsize * 6]
-            # B_all, L_all = np.zeros((nobs + windowsize * 6, AllStateNum)), np.zeros((nobs + windowsize * 6, 1))
-            # P_all = np.zeros((windowsize * 6 + nobs, windowsize * 6 + nobs))
-
-            # # prior part
-            # B_all[: windowsize * 6, :windowsize * 6] = np.identity(windowsize * 6)
-            # P_all[: windowsize * 6, :windowsize * 6] = self.m_StateCov
-            # L_all[: windowsize * 6, :] = StateFrame #WARNING: bugs may remain if not rectifying errors
-
-            # # observation part
-            # B_all[windowsize * 6:, ] = B
-            # P_all[windowsize * 6:, windowsize * 6: ] = np.identity(nobs) * self.m_PixelStd * self.m_PixelStd
-            # L_all[windowsize * 6:, ] = L
-            # P_all = np.linalg.inv(P_all)
-
-            # N = B_all.transpose() @ P_all @ B_all
-            # b = B_all.transpose() @ P_all @ L_all
-
-            # N11 = N[: windowsize * 6, : windowsize * 6]
-            # N12 = N[: windowsize * 6, windowsize * 6: ]
-            # N22 = N[windowsize * 6: , windowsize * 6: ]
-            # b1  = b[: windowsize * 6, : ]
-            # b2  = b[windowsize * 6: , : ]
-            # N22_inv = np.linalg.inv(N22)
-
-
-            # self.m_StateCov = np.linalg.inv(N11 - N12 @ N22_inv @ N12.transpose())
-            # state = np.linalg.inv(N11 - N12 @ N22_inv @ N12.transpose()) @ (b1 - N12 @ N22_inv @ b2)
-            # StateFrame = state[:, :]
-            # print(state)
-
-
-            # 2. update states. evaluate jacobian at groundtruth, do not update.
-            for j in range(Local):  
-                LocalFrames[j].m_pos = LocalFrames[j].m_pos - state[j * 6: j * 6 + 3, :]
-                LocalFrames[j].m_rota = LocalFrames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-
-            for id_ in self.m_MapPoints.keys():
-                position = self.m_MapPoints[id_]
-                self.m_MapPoints_Point[id_].m_pos -= state[StateFrameSize + position : StateFrameSize + position + 3]
-
-            # 3. remove old frame and its covariance
-            for _id in range(Local - 1):
-                LocalFrames_gt[_id] = LocalFrames_gt[_id + 1]
-                LocalFrames[_id] = LocalFrames[_id + 1]
-            tmp = (windowsize - 1) * 6
-            self.m_StateCov[: tmp, : tmp] = self.m_StateCov[6: , 6: ]
-            self.m_StateCov[tmp: tmp + 6, :] = 0
-            self.m_StateCov[:, tmp: tmp + 6] = 0
-            Local -= 1
-            StateFrame[: tmp, :] = StateFrame[6:, :]
-            StateFrame[tmp:, :] = 0
-            for LocalId, frame in LocalFrames.items():
-                frame.setNotUse()
-            # print(StateFrame)
-        return frames
+            Dmarg = self.m_Npmarg[StateFrameSize:, StateFrameSize:]
+            # bmarg, Dmarg = self.submarg_Kitti()
+            FrameStateNum = windowsize * 6
+            mapping, IDLocalPos = {}, {}
+            # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            for mappointID, GlobalPos in self.m_MapPoints.items():
+                if mappointID in self.m_LandmarkLocal.keys():
+                    LocalPos = self.m_LandmarkLocal[mappointID] * 3
+                    mapping[GlobalPos + FrameStateNum] = LocalPos
+                    IDLocalPos[mappointID] = LocalPos
+            mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
+            for gpos, lpos in mapping.items():
+                for gpos1, lpos1 in mapping.items():
+                    # NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
+                    self.m_StateCov[gpos: gpos + 3, gpos1: gpos1 + 3] = Dmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
+                # bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
+        
+        # np.savetxt("./log/cov.txt", self.m_StateCov)
+        # np.savetxt("./log/np.txt", self.m_Npmarg)
 
     def solveSW_Marg(self, frames, frames_gt, camera, windowsize=20, maxtime=-1, iteration=1):
         """_summary_

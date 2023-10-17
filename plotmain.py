@@ -1,18 +1,19 @@
-from cProfile import label
-from copyreg import add_extension
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
-import os
-from matplotlib.gridspec import GridSpec
 import glob
-from matplotlib.pyplot import MultipleLocator
-from matplotlib.ticker import MultipleLocator, FormatStrFormatter 
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from matplotlib.patches import ConnectionPatch
+import os
+from copyreg import add_extension
+from cProfile import label
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import ticker
+from matplotlib.gridspec import GridSpec
+from matplotlib.patches import ConnectionPatch
+from matplotlib.pyplot import MultipleLocator
+from matplotlib.ticker import FormatStrFormatter, MultipleLocator
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from mpl_toolkits.mplot3d import Axes3D
+
 
 def RMS(gt, obs):
     rms = np.sqrt(((gt - obs) ** 2).sum() / gt.shape[0])
@@ -157,8 +158,14 @@ def ploterror(time, neu, save, attribute, isSubplot):
     plt.rcParams['ytick.direction'] = 'in'
     fig, ax = plt.subplots(1, 1, figsize=(5.0393701, 3.4645669))
     direc = attribute['legend']
+    color = {3: [(63 / 255), (169 / 255), (245 / 255)],  # black
+         2: [(255 / 255), (102 / 255), (102 / 255)],  # red
+         1: [(255 / 255), (146 / 255), (0 / 255)],  # blue
+         0: [(0 / 255), (141 / 255), (0 / 255)],
+         4: [(20 / 255), (169 / 255), (89 / 255)],
+         5: [(70 / 255), (114 / 255), (196 / 255)]}  # green
     # print(save)
-    for i in range(3):
+    for i in range(neu.shape[1]):
 
         # ax = plt.subplot(3, 1, i + 1)
         # plt.tight_layout()
@@ -676,6 +683,70 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     plt.savefig(save, transparent=True)
     plt.show()
 
+
+def plotLogY(time, y, save, attribute, isSubplot):
+    # if neu.shape[0] < 1:
+    #     return
+    color = {3: [(63 / 255), (169 / 255), (245 / 255)],  # black
+         2: [(255 / 255), (102 / 255), (102 / 255)],  # red
+         1: [(255 / 255), (204 / 255), (102 / 255)],  # blue
+         0: [(0 / 255), (141 / 255), (0 / 255)],
+         4: [(20 / 255), (169 / 255), (89 / 255)],
+         5: [(70 / 255), (114 / 255), (196 / 255)]}  # green
+
+    xmajorFormatter = FormatStrFormatter('%1.2f') #设置x轴标签文本的格式 
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    fig, ax = plt.subplots(1, 1, figsize=(5.0393701, 3.4645669))
+    direc = attribute['legend']
+    if len(direc) != 0:
+        for i in range(len(y)):
+            plt.semilogy(time, y[i], ls="-", color=color[i], label=direc[i], linewidth=2)
+    else:
+        for i in range(len(y)):
+            plt.semilogy(time, y[i], ls="-", color=color[i], linewidth=2)
+    plt.ylabel(attribute['ylabel'], labelpad=3, fontsize = 13, fontdict=font)
+    plt.yticks(size = 12, fontproperties='Cambria')
+    # plt.ylim(-3, 3)
+    # plt.subplots_adjust(top=1)
+    plt.margins(x=0, y=0)
+    plt.grid(linestyle='--', color='k', alpha=0.4)
+    # if isSubplot:
+    #     subPlotAtt = attribute["subplot"]
+    #     xpos, ypos, width, height = subPlotAtt["xpos"], subPlotAtt["ypos"], subPlotAtt["width"], subPlotAtt["height"]
+    #     axins = ax.inset_axes((xpos, ypos, width, height))
+    #     rangeS, rangeE = subPlotAtt["range"][0], subPlotAtt["range"][1]
+    #     for i in range (3):
+    #         axins.plot(time[rangeS: rangeE], (neu[rangeS: rangeE, i]) , ls="-", color=color[i], label=direc[i], linewidth=2)#, marker=marker[i], markersize=4)
+    #     # axins.grid(b=False, linestyle='--', color='k', alpha=0.4)
+        
+    #     ylimS, ylimE = subPlotAtt["ylim"][0], subPlotAtt["ylim"][1]
+    #     axins.set_xlim(subPlotAtt["xlim"][0], subPlotAtt["xlim"][1])
+    #     axins.set_ylim(ylimS, ylimE)
+    #     # mark_inset()
+    #     loc1, loc2 = subPlotAtt["loc"][0], subPlotAtt["loc"][1]
+    #     mark_inset(ax, axins, loc1=loc1, loc2=loc2, fc="none", ec='k', lw=1)
+    if len(direc) != 0:
+        legend = plt.legend(loc='upper right', fontsize = 12, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.02, 1.16), fancybox=False)
+        ax = legend.get_frame()
+    ax.set_alpha(1)
+    ax.set_facecolor('none')
+
+    ax = plt.gca()
+    
+    if attribute["xlim"][0] != attribute["xlim"][1]:
+        plt.xlim(attribute["xlim"][0], attribute["xlim"][1])
+    if attribute["ylim"][0] != attribute["ylim"][1]:
+        plt.ylim(attribute["ylim"][0], attribute["ylim"][1])
+    # print(test)
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    plt.xlabel(attribute["xlabel"], fontdict=font)
+    plt.savefig(save, transparent=True)
+    plt.show()
 
 # # residual = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-03-08.txt"
 # calResPath_vio = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\20220308_no_loop.tum"
