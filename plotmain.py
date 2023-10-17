@@ -2,7 +2,7 @@ import glob
 import os
 from copyreg import add_extension
 from cProfile import label
-
+from matplotlib.collections import LineCollection
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,6 +13,7 @@ from matplotlib.pyplot import MultipleLocator
 from matplotlib.ticker import FormatStrFormatter, MultipleLocator
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.colors as mcolors
 
 
 def RMS(gt, obs):
@@ -684,6 +685,81 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     plt.show()
 
 
+def plotPointsWithTraj2D(trajs=[], points=[], save="./"):
+    plt.ioff()
+    plt.close()
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    ax = plt.figure(figsize=(3, 3))
+    # ax.view_init(elev=45, azim=60, roll=0)
+    # direc = ["Y", "P", "R"]
+    marker=["o", "^", "D"]
+    # print(save)
+
+    # ax = plt.subplot(3, 1, i + 1)
+    # plt.tight_layout()
+    # if i != 2:
+    #     plt.setp(ax.get_xticklabels(), visible=False)
+    # plt.grid(b=False, linestyle='--', color='k', alpha=0.5)
+    plt.plot(trajs[:, 0], trajs[:, 1], linewidth=4, c=color[2], alpha=0.8)
+
+    plt.scatter(points[:, 0], points[:, 1], color=color[3], s=7)
+    # ax.grid(False)
+    ax = plt.gca()
+    plt.ylabel("y [m]", labelpad=3, fontsize = 13, fontdict=font)
+    plt.yticks(size = 12, fontproperties='Cambria')
+    # ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0))
+    # ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0))
+    # ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0))
+    # ax.set_zlim(0, 10)
+    # ax.set_xticks([-15, -10, -5, 0, 5])
+    # ax.set_yticks([-12.5, -7.5, -2.5, 2.5, 7.5, 12.5])
+    # ax.set_zticks([-2, 0, 2])
+    ax.set_xlabel("x (m)", fontdict=font)
+    ax.set_ylabel("y (m)", fontdict=font)
+    # ax.set_zlabel("z (m)", fontdict=font)
+    # plt.grid(linestyle='--', color='k', alpha=0.4)
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    # plt.xlabel("m", fontdict=font)
+    plt.ylim(-15, 15)
+    plt.xlim(-20, 10)
+
+    ax = plt.gca()
+    ax.set_aspect('equal')
+
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.margins(x=0, y=0)
+    # ax.spines['right'].set_visible(False)
+    # ax.spines['top'].set_visible(False)
+    # ax.spines['left'].set_visible(False)
+    # ax.spines['bottom'].set_visible(False)
+    # plt.yticks([])
+    # plt.xticks([])
+    # plt.ylim(-12.5, 12.5)
+    # plt.xlim(-15, 5)
+    # plt.zlim(-2, 2)
+    # ax.set_zlim(-2, 2)
+    # plt.figure(2)
+    # plt.plot(trajs[:, 0], trajs[:, 1])
+    # ax = plt.gca()
+    # ax.set_aspect(1)
+
+
+    # ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([1, 1, 0.5, 1]))
+
+    # plt.subplots_adjust(left=0.14, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    # plt.xlabel("Epoch (sec)", fontdict=font)
+    plt.savefig(save, transparent=True)
+    plt.show()
+
+
 def plotLogY(time, y, save, attribute, isSubplot):
     # if neu.shape[0] < 1:
     #     return
@@ -748,6 +824,63 @@ def plotLogY(time, y, save, attribute, isSubplot):
     plt.savefig(save, transparent=True)
     plt.show()
 
+def plotTrajWithError2D(gt_pos, error, attribute, save):
+    plt.ioff()
+    plt.close()
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    fig, ax = plt.subplots(figsize=(5.0393701, 5.0393701))
+
+    xlim, ylim = attribute['xlim'], attribute['ylim']
+    ax.set_xlim(xlim[0], xlim[1])
+    ax.set_ylim(ylim[0], ylim[1])    
+    plt.axis([xlim[0], xlim[1], ylim[0], ylim[1]])
+
+    points = np.array([gt_pos[:, 0], gt_pos[:, 2]]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    barrange = attribute['barrange']
+    norm = mcolors.LogNorm(barrange[0], barrange[1])
+    # norm = plt.Normalize(error.min(), error.max())
+    lc = LineCollection(segments, cmap='viridis', norm=norm)
+    lc.set_array(error)
+    lc.set_linewidth(4) 
+    line = ax.add_collection(lc) 
+    bar = fig.colorbar(line, ax=ax, orientation='horizontal', fraction=attribute["barfraction"], pad=0.04, shrink=1.0, location="top")
+    bar.set_label(attribute['barlabel'], fontdict=font1)
+
+    ax = plt.gca()
+    # plt.ylabel("y [m]", labelpad=3, fontsize = 13, fontdict=font)
+    plt.yticks(range(ylim[0], ylim[1] + 1, ylim[2]), size = 12, fontproperties='Cambria')
+    plt.xticks(range(xlim[0], xlim[1] + 1, xlim[2]), size = 12, fontproperties='Cambria')
+
+    ax.set_xlabel(attribute["xlabel"], fontdict=font)
+    ax.set_ylabel(attribute["ylabel"], fontdict=font)
+    # ax.set_zlabel("z (m)", fontdict=font)
+    plt.grid(linestyle='-', color='k', alpha=0.2, linewidth=1)
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+
+    # # ax.set_xlabel("x (m)", fontdict=font)
+    # # ax.set_ylabel("y (m)", fontdict=font)
+    # # ax.set_zlabel("z (m)", fontdict=font)
+
+    ax = plt.gca()
+    ax.set_aspect('equal')
+
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.margins(x=0, y=0)
+
+
+    plt.subplots_adjust(left=0.14, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    # plt.xlabel("Epoch (sec)", fontdict=font)
+    plt.savefig(save, transparent=True)
+    plt.show()
 # # residual = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-03-08.txt"
 # calResPath_vio = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\20220308_no_loop.tum"
 # # gtPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-04-15.txt.gt"

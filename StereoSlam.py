@@ -156,7 +156,7 @@ class StereoSlam:
         # points[:, 1] = points[:, 2]
         # points[:, 2] = y
         print (path[:, 2])
-        plotmain.plotPointsWithTraj(path, points, "")
+        plotmain.plotPointsWithTraj2D(path, points, "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/data_2/results/simu_senario.svg")
 
         
             
