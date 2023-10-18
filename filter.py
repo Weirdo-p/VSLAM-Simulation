@@ -774,7 +774,7 @@ class KalmanFilter:
                 N[: windowsize * 6, : windowsize * 6]
                 N_inv = np.linalg.inv(N + np.linalg.inv(self.m_StateCov))
                 state = N_inv @ b
-                self.m_StateCov = N_inv
+                # np.savetxt("./log/N_test.txt", np.linalg.inv(self.m_StateCov))
                 # B_all, L_all = np.zeros((nobs + windowsize * 6, AllStateNum)), np.zeros((nobs + windowsize * 6, 1))
                 # P_all = np.zeros((windowsize * 6 + nobs, windowsize * 6 + nobs))
 
@@ -821,6 +821,7 @@ class KalmanFilter:
                 # if iter != 9:
                 prevstate = state.copy()
                 iter += 1
+            self.m_StateCov = N_inv
             self.passcov(LocalFrames, N_inv, windowsize)
 
             # 3. remove old frame and its covariance
@@ -893,8 +894,21 @@ class KalmanFilter:
             self.m_StateCov = np.zeros((StateNum, StateNum))
             self.m_StateCov[StateFrameSize:, StateFrameSize: ] = np.identity(StateLandmark) * self.m_PointStd * self.m_PointStd
             self.m_StateCov[: StateFrameSize, : StateFrameSize] = tmp_cov[: StateFrameSize, : StateFrameSize]
+        
+        if len(self.m_LandmarkLocal) == 0:
+            # B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            # P = np.zeros((StateNum, StateNum))
+            # B = np.identity(StateNum)
+            # P = NPrior
 
-        if len(self.m_LandmarkLocal) != 0:
+            # L[: windowsize * 6, :] = 0 
+            # # print(L)
+            # NPrior = B.transpose() @ P @ B # + np.identity(6) * 1E8
+            # NPrior[:6, :6] = np.identity(6) * 1E-4
+            # bPrior = B.transpose() @ P @ L
+            # NPrior_inv = self.m_StateCov.copy()
+            self.m_StateCov[:6, :6] =  np.identity(6) * 1E-4
+        else:
 
             Dmarg = self.m_Npmarg[StateFrameSize:, StateFrameSize:]
             # bmarg, Dmarg = self.submarg_Kitti()

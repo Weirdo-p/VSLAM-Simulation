@@ -11,7 +11,8 @@ import plotmain as main
 
 
 #%% init result file
-prefix = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/data_2/data/37/"
+prefix = "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/data_2/data/1/"
+# name = "result.txt.-1s.CLS_SW_Marg1.Noise"
 name = "result.txt.-1s.Filter_SW.Noise"
 path_to_output = prefix + name
 
