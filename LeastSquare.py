@@ -165,11 +165,16 @@ class CLS:
     
     def __addFeaturesKitti(self, features):
         count = 0
-        for feat in features:
+
+        for i_feat in range(len(features)):
+            feat = features[i_feat]
             mappoint = feat.m_mappoint
             mappoint.check()
             if mappoint.m_buse < 1:
                 continue
+            if feat.m_PosInCamera[2, 0] < 1:
+                feat.m_buse = False
+                # continue
             if feat.m_buse == True:
                 count += 1
             mappointID = mappoint.m_id
@@ -583,7 +588,7 @@ class CLS:
         SaveFrames = None
 
         prevstate = None
-        iter = 0
+        iter, wrong_iter = 0, 0
         while iter < 10:
             # 1. search for observations and landmarks
             self.m_MapPoints = {}
@@ -606,7 +611,6 @@ class CLS:
             StateFrame = np.zeros((windowsize_tmp * 6, 1))
             NPrior, bPrior = self.premarginalization(windowsize_tmp, AllStateNum, StateFrame)
             Ncom, bcom = self.compensateFEJ(NPrior, windowsize)
-            
             for LocalID in range(len(frames)):
                 frame = frames[LocalID]
                 tec, Rec = frame.m_pos, frame.m_rota
@@ -624,9 +628,26 @@ class CLS:
             # b = B.transpose() @ R @ L
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
 
-            state = self.solveMarg(N + NPrior, b + bPrior + bcom, windowsize)
-            # state = np.linalg.inv(N + NPrior) @ (b + bPrior + bcom)
-
+            # state = self.solveMarg(N + NPrior, b + bPrior + bcom, windowsize)
+            state = np.linalg.inv(N + NPrior) @ (b + bPrior + bcom)
+            for frame in frames:
+                if np.abs(frame.m_time - 42.192) <= 1E-2:
+                    print("test")
+                    # np.savetxt("./log/swo_N.txt", N)
+                    # np.savetxt("./log/swo_b.txt", b)
+                    # # np.savetxt("./log/swo_bcom.txt", bcom)
+                    # np.savetxt("./log/swo_bprior.txt", bPrior)
+                    # np.savetxt("./log/swo_Nprior.txt", NPrior)
+                    # np.savetxt("./log/swo_state.txt", state)
+            # np.savetxt("./log/swo_N.txt", N)
+            # np.savetxt("./log/swo_b.txt", b)
+            # # np.savetxt("./log/swo_bcom.txt", bcom)
+            # np.savetxt("./log/swo_bprior.txt", bPrior)
+            # np.savetxt("./log/swo_Nprior.txt", NPrior)
+            # np.savetxt("./log/swo_state.txt", state)
+            # if np.abs(frames[0].m_id - 21.35717) < 1E-2:
+            #     np.savetxt("./log/mswo_Np_test_"+ str(iter) + ".txt", NPrior)
+            #     np.savetxt("./log/mswo_N_" + str(iter) + ".txt", N)
             for j in range(windowsize_tmp):  
                 frames[j].m_pos =  frames[j].m_pos - state[j * 6: j * 6 + 3, :]
                 frames[j].m_rota = frames[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
@@ -640,6 +661,10 @@ class CLS:
             if self.removeOutlier(map, camera):
                 self.loadstates(frames, self.m_MapPoints_Point)
                 prevstate = state
+                wrong_iter += 1
+
+                if wrong_iter >= 30:
+                    return -1
                 # # if iter > 0:
                 # iter -= 1
                 continue
@@ -963,19 +988,6 @@ class CLS:
             
             Ncom, bcom = NPrior.copy(), NPrior @ Xdiff
             print(np.max(np.abs(Xdiff)), np.min(Xdiff))
-            # J = np.linalg.cholesky(self.m_Nmarg).transpose()
-            # J_return = np.zeros(NPrior.shape)
-            # for gpos, lpos in mapping.items():
-            #     for gpos1, lpos1 in mapping.items():
-            #         J_return[gpos: gpos + 3, gpos1: gpos1 + 3] = J[lpos: lpos + 3, lpos1: lpos1 + 3]
-
-            
-            # validate / debug -----------
-            # print (np.all(np.abs(J_return.transpose() @ J_return - NPrior)) < 1E-9)
-            # marginalization should constrain landmarks only
-            # print (np.all(NPrior[: FrameStateNum, : FrameStateNum] == 0))
-            # print (np.all(Xdiff == 0))
-            # --------------------
             
         return Ncom, bcom
 
@@ -1003,16 +1015,16 @@ class CLS:
         NPrior = np.linalg.inv(NPrior_inv)
 
         if len(self.m_LandmarkLocal) == 0:
-            B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
-            P = np.zeros((StateNum, StateNum))
-            B = np.identity(StateNum)
-            P = NPrior
+            # B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+            # P = np.zeros((StateNum, StateNum))
+            # B = np.identity(StateNum)
+            # P = NPrior
 
-            L[: windowsize * 6, :] = 0 
-            # print(L)
-            NPrior = B.transpose() @ P @ B # + np.identity(6) * 1E8
+            # L[: windowsize * 6, :] = 0 
+            # # print(L)
+            # NPrior = B.transpose() @ P @ B # + np.identity(6) * 1E8
             NPrior[:6, :6] = np.identity(6) * 1E4
-            bPrior = B.transpose() @ P @ L
+            # bPrior = B.transpose() @ P @ L
             # NPrior_inv = self.m_StateCov.copy()
         else:
             Nmarg, bmarg = self.submarg()
@@ -1024,14 +1036,16 @@ class CLS:
                     LocalPos = self.m_LandmarkLocal[mappointID] * 3
                     mapping[GlobalPos + FrameStateNum] = LocalPos
                     IDLocalPos[mappointID] = LocalPos
-            mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
+            # mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
                     NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                     # NPrior_inv[gpos: gpos + 3, gpos1: gpos1 + 3] = self.m_Dmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                 bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
             # np.savetxt("./log/NPrior.txt", NPrior)
-            
+            # NPrior += np.identity(NPrior.shape[0]) * 1E-6
+        # triu = np.triu(NPrior)
+        # triu += triu.transpose() - np.diag(triu.diagonal())
         return NPrior, bPrior #, NPrior_inv, X_return, dX
 
     def ReposLandmarks(self, mapping, IDLocalPos, windowsize=20):
@@ -1186,6 +1200,10 @@ class CLS:
                 continue
             if feat.m_buse == False:
                 continue
+            if mappoint.m_id not in self.m_MapPoints.keys():
+                continue
+            # if feat.m_PosInCamera[2, 0] < 1:
+            #     continue
             obsnum += 1
 
         # for row in range(len(features)):
@@ -1198,17 +1216,25 @@ class CLS:
         fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
 
         row = 0
-        for feat in features:
+        for i_feat in range(len(features)):
+            feat = features[i_feat]
             mappoint = feat.m_mappoint
             if mappoint.m_buse < 1:
                 continue
             if feat.m_buse == False:
+                continue
+            if mappoint.m_id not in self.m_MapPoints.keys():
                 continue
             pointPos = self.getLandmarkFEJ(mappoint)
             pointID = mappoint.m_id
             nobs = len(mappoint.m_obs)
             a = np.linalg.norm(pointPos, 2)
             pointPos_c = np.matmul(Rec, (pointPos - tec))
+            feat.m_PosInCamera = pointPos_c
+            if pointPos_c[2, 0] < 1:
+                feat.m_buse = False
+                continue
+
             uv = camera.project(pointPos_c)
             uv_obs = feat.m_pos
             PointIndex = self.m_MapPoints[pointID]
@@ -1227,5 +1253,10 @@ class CLS:
             J[row * 3: row * 3 + 3, LocalID * 6 + 3 : LocalID * 6 + 6] = Jphi
             J[row * 3: row * 3 + 3, FrameStateNum + PointIndex : FrameStateNum + PointIndex + 3] = JPoint
             row += 1
+
+        J = J[[not np.all(J[i] == 0) for i in range(J.shape[0])], :]
+        l = l[[not np.all(l[i] == 0) for i in range(l.shape[0])], :]
+        P = P[[not np.all(P[i] == 0) for i in range(P.shape[0])], :]
+        P = P[:, [not np.all(P[:, i] == 0) for i in range(P.shape[1])]]
 
         return J, P, l

@@ -52,6 +52,26 @@ class StereoSlam:
                     i_frame += 1
                 else:
                     break
+
+    def removeRepeatedOutlier(self):
+
+        for frame in self.m_frames:
+            feat_to_remove = []
+            features = frame.m_features
+            for i in range(len(features) - 1):
+                for j in range(i + 1, len(features)):
+                    if np.linalg.norm(features[i].m_pos - features[j].m_pos) < 3:
+                        
+                        feat_to_remove.append(j)
+                        # break
+            
+            print(frame.m_id, " removes ", len(feat_to_remove), " features")
+            frame.m_features = [n for i, n in enumerate(frame.m_features) if i not in feat_to_remove]
+            # for i in range(len(feat_to_remove)):
+            #     del frame.m_features[feat_to_remove[i]]
+        # pass
+
+
         
     def readFeatureFile(self, path_features):
         for path_feat in path_features:
@@ -1102,7 +1122,9 @@ class StereoSlam:
             return False
         if self.m_lframe is not None:
             nframe.m_rota, nframe.m_pos = self.m_lframe.m_rota.copy(), self.m_lframe.m_pos.copy()
+        
         for iter in range(10):
+            useful = 0
             N, b = np.zeros((ParamNum, ParamNum)), np.zeros((ParamNum, 1))
             pRwc, pPwc = nframe.m_rota, nframe.m_pos
             pRwc_copy, pPwc_copy = nframe.m_rota.copy(), nframe.m_pos.copy()
@@ -1134,7 +1156,11 @@ class StereoSlam:
 
                 N += J.transpose() @ P @ J
                 b += J.transpose() @ P @ L
+                useful += 1
             # np.savetxt("./debug/N.txt", N)
+            print("this debug,", useful)
+            if useful < 3:
+                return False
             try:
                 dx = np.linalg.inv(N) @ b
             except Exception:
@@ -1144,13 +1170,24 @@ class StereoSlam:
             nframe.m_pos = nframe.m_pos - dx[0: 3, :]
             nframe.m_rota = nframe.m_rota @ (np.identity(3) - SkewSymmetricMatrix(dx[3: 6, :]))
             nframe.m_rota = UnitRotation(nframe.m_rota)
-            # if self.removeOutlier(usedLandmarks, nframe):
-            #     nframe.m_pos = pPwc_copy.copy()
-            #     nframe.m_rota = pRwc_copy.copy()
+            if self.removeOutlier(usedLandmarks, nframe):
+                nframe.m_pos = pPwc_copy.copy()
+                nframe.m_rota = pRwc_copy.copy()
 
         for i in range(len(nframe.m_features)):
             nframe.m_features[i].m_buse = True
-        # self.ProjectLandmarks(nframe)
+
+        for i in range(len(nframe.m_features)):
+            pfeat = nframe.m_features[i]
+            if pfeat.m_mappoint not in usedLandmarks:
+                continue
+            if pfeat.m_buse == False:
+                continue
+            PointPos = pfeat.m_mappoint.m_pos
+            PointPos_c = pRwc @ (PointPos - pPwc)
+            pfeat.m_PosInCamera = PointPos_c
+            if PointPos_c[2, 0] < 1:
+                pfeat.m_buse = False
 
         return True
     

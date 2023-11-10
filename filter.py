@@ -1127,20 +1127,12 @@ class KalmanFilter:
         # NPrior = np.linalg.inv(NPrior_inv)
 
         if len(self.m_LandmarkLocal) == 0:
-            # B, L = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
-            # P = np.zeros((StateNum, StateNum))
-            # B = np.identity(StateNum)
-            # NPrior = np.linalg.inv(NPrior_inv)
-
-            # P = NPrior
-
-            # L[: windowsize * 6, :] = 0 
-            # # print(L)
-            # NPrior = B.transpose() @ P @ B
-            # bPrior = B.transpose() @ P @ L
-            NPrior_inv[:6, : 6] = np.identity(6) * 1E-4
+            NPrior = np.linalg.inv(NPrior_inv)
+            NPrior[:6, : 6] = np.identity(6) * 1E4
+            NPrior_inv = np.linalg.inv(NPrior)
         else:
             bmarg, Dmarg = self.submarg_Kitti()
+            # Nmarg = np.linalg.inv(Dmarg)
             FrameStateNum = windowsize * 6
             mapping, IDLocalPos = {}, {}
             # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
@@ -1150,11 +1142,18 @@ class KalmanFilter:
                     mapping[GlobalPos + FrameStateNum] = LocalPos
                     IDLocalPos[mappointID] = LocalPos
             mapping = self.ReposLandmarks(mapping, IDLocalPos, windowsize)
+            # NPrior = np.linalg.inv(NPrior_inv)
             for gpos, lpos in mapping.items():
                 for gpos1, lpos1 in mapping.items():
                     # NPrior[gpos: gpos + 3, gpos1: gpos1 + 3] = Nmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                     NPrior_inv[gpos: gpos + 3, gpos1: gpos1 + 3] = Dmarg[lpos: lpos + 3, lpos1: lpos1 + 3]
                 bPrior[gpos: gpos + 3, : ] = bmarg[lpos: lpos + 3, :]
+            # NPrior += np.identity(NPrior.shape[0]) * 1E-6
+
+            # NPrior = np.linalg.inv(NPrior_inv)
+            # triu = np.triu(NPrior)
+            # triu += triu.transpose() - np.diag(triu.diagonal())
+            # NPrior_inv = np.linalg.inv(triu)
 
         return bPrior, NPrior_inv #, NPrior_inv, X_return, dX
     
@@ -1179,12 +1178,12 @@ class KalmanFilter:
                 self.m_MapPoints[mappoindID] = OtherLandmarkStart
                 OtherLandmarkStart += 3
 
-            MappingOut = {}
-            # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
-            for mappointID, GlobalPos in self.m_MapPoints.items():
-                if mappointID in self.m_LandmarkLocal.keys():
-                    LocalPos = self.m_LandmarkLocal[mappointID] * 3
-                    MappingOut[GlobalPos + StartPos] = LocalPos
+        MappingOut = {}
+        # NPrior, bPrior = np.zeros((StateNum, StateNum)), np.zeros((StateNum, 1))
+        for mappointID, GlobalPos in self.m_MapPoints.items():
+            if mappointID in self.m_LandmarkLocal.keys():
+                LocalPos = self.m_LandmarkLocal[mappointID] * 3
+                MappingOut[GlobalPos + StartPos] = LocalPos
         MappingOut = dict(sorted(MappingOut.items(), key=lambda x : (x[1], x[0])))
 
         return MappingOut
@@ -1250,7 +1249,7 @@ class KalmanFilter:
             if mappointID in self.m_LandmarkLocal.keys():
                 LocalPos = self.m_LandmarkLocal[mappointID] * 3
                 mapping[GlobalPos + FrameStateNum] = LocalPos
-        if self.m_Jmarg.shape[0] != 0:
+        if self.m_Npmarg.shape[0] != 0:
             # differences of constrained landmarks.
             # note that frames are not constrained in this case
             # frame of Xdiff remains 0
@@ -1604,7 +1603,9 @@ class KalmanFilter:
         SaveFrames = None
 
         prevstate = None
-        iter = 0
+        iter, wrong_iter = 0, 0
+        debug_iter = 0
+
         while iter < 10:
             # 1. search for observations and landmarks
             self.m_MapPoints = {}
@@ -1666,6 +1667,12 @@ class KalmanFilter:
             # N = B.transpose() @ R @ B
             # b = B.transpose() @ R @ L
             print(TotalObsNum / 3, "observations used," , StateLandmark / 3, "landmarks used")
+            # NPrior = np.linalg.inv(NPrior_inv)
+            # state1 = np.linalg.inv(N + NPrior) @ (b + bPrior + NPrior @ np.zeros((NPrior.shape[0], 1)) + dx)
+
+            # if np.linalg.norm(state - state1) > 1E-2:
+            #     print("something wrong")
+            # state = state1
             # np.savetxt("./log/P_R.txt", np.linalg.inv(R) - P)
             # K = NPrior_inv @ B.transpose() @ np.linalg.inv(np.linalg.inv(R) + B @ NPrior_inv @ B.transpose())
             # XPrior = NPrior_inv @ bPrior
@@ -1682,9 +1689,14 @@ class KalmanFilter:
                 position = self.m_MapPoints[id_]
                 self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3, :]
             # self.check(map, camera)
+
             if self.removeOutlier(map, camera):
                 self.loadstates(frames, self.m_MapPoints_Point)
                 prevstate = state
+                wrong_iter += 1
+
+                if wrong_iter >= 30:
+                    return -1
                 # # if iter > 0:
                 # iter -= 1
                 continue
@@ -2014,11 +2026,15 @@ class KalmanFilter:
 
     def __addFeaturesKitti(self, features):
         count = 0
-        for feat in features:
+        for i_feat in range(len(features)):
+            feat = features[i_feat]
             mappoint = feat.m_mappoint
             mappoint.check()
             if mappoint.m_buse < 1:
                 continue
+            if feat.m_PosInCamera[2, 0] < 1:
+                feat.m_buse = False
+                # continue
             if feat.m_buse == True:
                 count += 1
             mappointID = mappoint.m_id
@@ -2043,6 +2059,10 @@ class KalmanFilter:
                 continue
             if feat.m_buse == False:
                 continue
+            if mappoint.m_id not in self.m_MapPoints.keys():
+                continue
+            # if feat.m_PosInCamera[2, 0] < 1:
+            #     continue
             obsnum += 1
 
         # for row in range(len(features)):
@@ -2055,17 +2075,24 @@ class KalmanFilter:
         fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
 
         row = 0
-        for feat in features:
+        for i_feat in range(len(features)):
+            feat = features[i_feat]
             mappoint = feat.m_mappoint
             if mappoint.m_buse < 1:
                 continue
             if feat.m_buse == False:
+                continue
+            if mappoint.m_id not in self.m_MapPoints.keys():
                 continue
             pointPos = self.getLandmarkFEJ(mappoint)
             pointID = mappoint.m_id
             nobs = len(mappoint.m_obs)
             a = np.linalg.norm(pointPos, 2)
             pointPos_c = np.matmul(Rec, (pointPos - tec))
+            feat.m_PosInCamera = pointPos_c
+            if pointPos_c[2, 0] < 1:
+                feat.m_buse = False
+                continue
             uv = camera.project(pointPos_c)
             uv_obs = feat.m_pos
             PointIndex = self.m_MapPoints[pointID]
@@ -2085,6 +2112,11 @@ class KalmanFilter:
             J[row * 3: row * 3 + 3, FrameStateNum + PointIndex : FrameStateNum + PointIndex + 3] = JPoint
             row += 1
 
+
+        J = J[[not np.all(J[i] == 0) for i in range(J.shape[0])], :]
+        l = l[[not np.all(l[i] == 0) for i in range(l.shape[0])], :]
+        P = P[[not np.all(P[i] == 0) for i in range(P.shape[0])], :]
+        P = P[:, [not np.all(P[:, i] == 0) for i in range(P.shape[1])]]
         return J, P, l
 
         
