@@ -50,7 +50,8 @@ import sys
 for i in range(1, 11):
     if i== 3:
         continue
-    base = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/kitti1300/KITTI_" + "{0:02d}/".format(i)
+    # base = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/kitti1300/KITTI_" + "{0:02d}/".format(i)
+    base = "/home/xuzhuo/Documents/code/python/01-master/visual_simulation/kitti/03KITTI/"
     path_to_kitti = base + "Features/"
     path_to_feats = glob.glob(path_to_kitti + "*.txt")
     path_to_feats = sorted(path_to_feats, key=lambda name: float(name[len(path_to_kitti): len(name) - 4]))

@@ -829,13 +829,22 @@ def plotTrajWithError2D(gt_pos, error, attribute, save):
     plt.close()
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.direction'] = 'in'
-    fig, ax = plt.subplots(figsize=(5.0393701, 5.0393701))
-
+    fig, ax = plt.subplots(figsize=(3, 3))
     xlim, ylim = attribute['xlim'], attribute['ylim']
-    ax.set_xlim(xlim[0], xlim[1])
-    ax.set_ylim(ylim[0], ylim[1])    
-    plt.axis([xlim[0], xlim[1], ylim[0], ylim[1]])
-
+    ax = plt.gca()
+    if xlim[0] != xlim[1] and ylim[0] != ylim[1]:
+        ax.set_xlim(xlim[0], xlim[1])
+        ax.set_ylim(ylim[0], ylim[1])    
+        plt.axis([xlim[0], xlim[1], ylim[0], ylim[1]])
+        plt.yticks(range(ylim[0], ylim[1] + 1, ylim[2]), size = 12, fontproperties='Cambria')
+        plt.xticks(range(xlim[0], xlim[1] + 1, xlim[2]), size = 12, fontproperties='Cambria')
+    if attribute["scientific"]:
+        # scientific expression
+        formatter = ticker.ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True) 
+        formatter.set_powerlimits((0,0)) 
+        ax.yaxis.set_major_formatter(formatter)
+        ax.xaxis.set_major_formatter(formatter)
     points = np.array([gt_pos[:, 0], gt_pos[:, 2]]).T.reshape(-1, 1, 2)
     segments = np.concatenate([points[:-1], points[1:]], axis=1)
     barrange = attribute['barrange']
@@ -845,39 +854,42 @@ def plotTrajWithError2D(gt_pos, error, attribute, save):
     lc.set_array(error)
     lc.set_linewidth(4) 
     line = ax.add_collection(lc) 
-    bar = fig.colorbar(line, ax=ax, orientation='horizontal', fraction=attribute["barfraction"], pad=0.04, shrink=1.0, location="top")
-    bar.set_label(attribute['barlabel'], fontdict=font1)
-
+    # bar = fig.colorbar(line, ax=ax, orientation='horizontal', fraction=attribute["barfraction"], pad=0.04, shrink=1.0)
+    # bar.ax.tick_params(labelsize = 11)
+    # bar.set_label(attribute['barlabel'], fontdict=font1)
+    plt.xticks(size = 11)
+    plt.yticks(size = 11)
     ax = plt.gca()
     # plt.ylabel("y [m]", labelpad=3, fontsize = 13, fontdict=font)
-    plt.yticks(range(ylim[0], ylim[1] + 1, ylim[2]), size = 12, fontproperties='Cambria')
-    plt.xticks(range(xlim[0], xlim[1] + 1, xlim[2]), size = 12, fontproperties='Cambria')
+    # ax.set_xticks(ax.get_xticks(), size = 15, fontproperties='Calibri')
 
-    ax.set_xlabel(attribute["xlabel"], fontdict=font)
-    ax.set_ylabel(attribute["ylabel"], fontdict=font)
+    # ax.set_xlabel(attribute["xlabel"], fontdict=font)
+    # ax.set_ylabel(attribute["ylabel"], fontdict=font)
     # ax.set_zlabel("z (m)", fontdict=font)
     plt.grid(linestyle='-', color='k', alpha=0.2, linewidth=1)
     ax.spines['bottom'].set_linewidth(1)
     ax.spines['left'].set_linewidth(1)
     ax.spines['right'].set_linewidth(1)
     ax.spines['top'].set_linewidth(1)
-    plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
 
     # # ax.set_xlabel("x (m)", fontdict=font)
     # # ax.set_ylabel("y (m)", fontdict=font)
     # # ax.set_zlabel("z (m)", fontdict=font)
 
     ax = plt.gca()
-    ax.set_aspect('equal')
-
+    # ax.set_aspect(1./ax.get_data_ratio(), adjustable='box')
+    ax.set_aspect(1)
     ax.spines['bottom'].set_linewidth(1)
     ax.spines['left'].set_linewidth(1)
     ax.spines['right'].set_linewidth(1)
     ax.spines['top'].set_linewidth(1)
+    # ax.set_xticks(size = 15, fontproperties='Calibri')
+    # ax.set_yticks(size = 15, fontproperties='Calibri')
+
     plt.margins(x=0, y=0)
 
 
-    plt.subplots_adjust(left=0.14, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    plt.subplots_adjust(left=0.15, right=0.95, bottom=0.15, top=0.9, wspace=0.01, hspace=0.1)
     # plt.xlabel("Epoch (sec)", fontdict=font)
     plt.savefig(save, transparent=True)
     plt.show()
