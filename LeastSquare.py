@@ -1128,6 +1128,19 @@ class CLS:
         obsnum = len(features)
         FrameStateNum = len(self.m_estimateFrame) * 6
 
+        count = 0
+        for row in range(obsnum):
+            feat = features[row]
+            mappoint = feat.m_mappoint
+            pointID = mappoint.m_id
+            pointPos = mappoint.m_pos
+            pointPos_c = np.matmul(Rec, (pointPos - tec))
+            uv = camera.project(pointPos_c)
+            if pointPos_c[2, 0] < 1:
+                continue
+            count += 1
+        obsnum = count
+
         J, l = np.zeros((obsnum * 3, statenum)), np.zeros((obsnum * 3, 1))
         fx, fy, b = camera.m_fx, camera.m_fy, camera.m_b
         for row in range(obsnum):
@@ -1136,6 +1149,9 @@ class CLS:
             pointID = mappoint.m_id
             pointPos = mappoint.m_pos
             pointPos_c = np.matmul(Rec, (pointPos - tec))
+            if pointPos_c[2, 0] < 1:
+                continue
+            
             uv = camera.project(pointPos_c)
             uv_obs = feat.m_pos
             PointIndex = self.m_MapPoints[pointID]

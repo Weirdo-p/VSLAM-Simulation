@@ -159,9 +159,18 @@ class StereoSlam:
             pos[2, 0] = a            # tec.reshape(3, -1)
             # pos.reshape(3, -1)
 
-            # if np.abs(pos[0, 0]) > 50 or np.abs(pos[1, 0]) > 50 or np.abs(pos[2, 0]) > 50:
-            #     continue
+            if np.abs(np.abs(pos[2, 0])) > 7:
+                continue
+            if pos[0, 0] > 7.5 or pos[0, 0] < -17.5:
+                continue
+            if pos[1, 0] < -12.5 or pos[1, 0] > 12.5:
+                continue
             points.append(pos)
+
+    #             plt.ylim(-12.5, 12.5)
+    # plt.xlim(-17.5, 7.5)
+    # # plt.zlim(-2, 2)
+    # ax.set_zlim(-8, 8)
 
         
         
@@ -176,7 +185,7 @@ class StereoSlam:
         # points[:, 1] = points[:, 2]
         # points[:, 2] = y
         print (path[:, 2])
-        plotmain.plotPointsWithTraj2D(path, points, "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/data_2/results/simu_senario.svg")
+        plotmain.plotPointsWithTraj(path, points, "/home/xuzhuo/Documents/code/matlab/01-Simulation_Visual_IMU/Simulation_Visual_IMU/Matlab-PSINS-PVAIMUSimulator/data_2/results/simu_senario.svg")
 
         
             

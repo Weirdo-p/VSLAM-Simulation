@@ -21,12 +21,12 @@ def RMS(gt, obs):
     return rms
 
 font={
-      'family':'Cambria',
-      'size': 14, # corresponding to 10 pt
+    #   'family':'Cambria',
+      'size': 12, # corresponding to 10 pt
       'weight': 'bold'
 }
 font1={
-      'family':'Cambria',
+    #   'family':'Cambria',
       'size': 12, # corresponding to 10 pt
       'weight': 'bold'
 }
@@ -625,7 +625,7 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.direction'] = 'in'
     ax = plt.figure(figsize=(6, 6)).add_subplot(projection='3d')
-    ax.view_init(elev=45, azim=60, roll=0)
+    ax.view_init(elev=41, azim=56, roll=0)
     # direc = ["Y", "P", "R"]
     marker=["o", "^", "D"]
     # print(save)
@@ -646,9 +646,21 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0))
     ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0))
     # ax.set_zlim(0, 10)
-    # ax.set_xticks([-15, -10, -5, 0, 5])
-    # ax.set_yticks([-12.5, -7.5, -2.5, 2.5, 7.5, 12.5])
-    # ax.set_zticks([-2, 0, 2])
+    ax.set_xticks([-17.5, -12.5, -7.5, -2.5, 2.5, 7.5])
+    ax.set_yticks([-12.5, -7.5, -2.5, 2.5, 7.5, 12.5])
+    ax.set_zticks([-10, -5, 0, 5, 10])
+
+    ax.tick_params(axis='y',
+                 labelsize=11) 
+    ax.tick_params(axis='x',
+                 labelsize=11) 
+    ax.tick_params(axis='z',
+                 labelsize=11)
+    plt.ylim(-12.5, 12.5)
+    plt.xlim(-17.5, 7.5)
+    # plt.zlim(-2, 2)
+    ax.set_zlim(-10, 10)
+
     ax.set_xlabel("x (m)", fontdict=font)
     ax.set_ylabel("y (m)", fontdict=font)
     ax.set_zlabel("z (m)", fontdict=font)
@@ -667,14 +679,11 @@ def plotPointsWithTraj(trajs=[], points=[], save="./"):
     # ax.spines['bottom'].set_visible(False)
     # plt.yticks([])
     # plt.xticks([])
-    # plt.ylim(-12.5, 12.5)
-    # plt.xlim(-15, 5)
-    # plt.zlim(-2, 2)
-    # ax.set_zlim(-2, 2)
-    plt.figure(2)
-    plt.plot(trajs[:, 0], trajs[:, 1])
-    ax = plt.gca()
-    ax.set_aspect(1)
+
+    # plt.figure(2)
+    # plt.plot(trajs[:, 0], trajs[:, 1])
+    # ax = plt.gca()
+    # ax.set_aspect(1)
 
 
     # ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([1, 1, 0.5, 1]))
@@ -781,27 +790,13 @@ def plotLogY(time, y, save, attribute, isSubplot):
     else:
         for i in range(len(y)):
             plt.semilogy(time, y[i], ls="-", color=color[i], linewidth=2)
-    plt.ylabel(attribute['ylabel'], labelpad=3, fontsize = 13, fontdict=font)
-    plt.yticks(size = 12, fontproperties='Cambria')
+    plt.ylabel(attribute['ylabel'], labelpad=3, fontdict=font)
+    plt.yticks(size = 11)
+    plt.xticks(size = 11)
     # plt.ylim(-3, 3)
     # plt.subplots_adjust(top=1)
     plt.margins(x=0, y=0)
-    plt.grid(linestyle='--', color='k', alpha=0.4)
-    # if isSubplot:
-    #     subPlotAtt = attribute["subplot"]
-    #     xpos, ypos, width, height = subPlotAtt["xpos"], subPlotAtt["ypos"], subPlotAtt["width"], subPlotAtt["height"]
-    #     axins = ax.inset_axes((xpos, ypos, width, height))
-    #     rangeS, rangeE = subPlotAtt["range"][0], subPlotAtt["range"][1]
-    #     for i in range (3):
-    #         axins.plot(time[rangeS: rangeE], (neu[rangeS: rangeE, i]) , ls="-", color=color[i], label=direc[i], linewidth=2)#, marker=marker[i], markersize=4)
-    #     # axins.grid(b=False, linestyle='--', color='k', alpha=0.4)
-        
-    #     ylimS, ylimE = subPlotAtt["ylim"][0], subPlotAtt["ylim"][1]
-    #     axins.set_xlim(subPlotAtt["xlim"][0], subPlotAtt["xlim"][1])
-    #     axins.set_ylim(ylimS, ylimE)
-    #     # mark_inset()
-    #     loc1, loc2 = subPlotAtt["loc"][0], subPlotAtt["loc"][1]
-    #     mark_inset(ax, axins, loc1=loc1, loc2=loc2, fc="none", ec='k', lw=1)
+    plt.grid(linestyle='-', color='k', alpha=0.2)
     if len(direc) != 0:
         legend = plt.legend(loc='upper right', fontsize = 12, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.02, 1.16), fancybox=False)
         ax = legend.get_frame()
@@ -819,10 +814,105 @@ def plotLogY(time, y, save, attribute, isSubplot):
     ax.spines['left'].set_linewidth(1)
     ax.spines['right'].set_linewidth(1)
     ax.spines['top'].set_linewidth(1)
+    # ax.get_yticklabels().set_color("red")
     plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
     plt.xlabel(attribute["xlabel"], fontdict=font)
     plt.savefig(save, transparent=True)
     plt.show()
+
+
+
+def plotLogY_Twiny(time, y1, y2, save, attribute, isSubplot):
+    # if neu.shape[0] < 1:
+    #     return
+    color = {3: [(63 / 255), (169 / 255), (245 / 255)],  # black
+         2: [(255 / 255), (102 / 255), (102 / 255)],  # red
+         1: [(0 / 255), (148 / 255), (255 / 255)],  # blue
+         0: [(0 / 255), (141 / 255), (0 / 255)],
+         4: [(20 / 255), (169 / 255), (89 / 255)],
+         5: [(70 / 255), (114 / 255), (196 / 255)]}  # green
+
+    xmajorFormatter = FormatStrFormatter('%1.2f') #设置x轴标签文本的格式 
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    fig, ax = plt.subplots(1, 1, figsize=(5.0393701, 3.4645669))
+    direc = attribute['legend']
+    if len(direc) != 0:
+        for i in range(len(y1)):
+            line1 = ax.semilogy(time, y1[i], ls="-", color=color[i], label=direc[i], linewidth=2)
+    else:
+        for i in range(len(y1)):
+            line1 = ax.semilogy(time, y1[i], ls="-", color=color[i], linewidth=2)
+    font_tmp={
+    #   'family':'Cambria',
+      'size': 12, # corresponding to 10 pt
+      'weight': 'bold',
+      'color': color[0]
+    }
+
+    plt.ylabel(attribute['y1label'], labelpad=3, fontdict=font)
+    plt.yticks(size = 11)
+    plt.xticks(size = 11)
+    # plt.ylim(-3, 3)
+    # plt.subplots_adjust(top=1)
+    plt.margins(x=0, y=0)
+    plt.grid(linestyle='-', color='k', alpha=0.2)
+    ax = plt.gca()
+    ax.set_xlabel(attribute['xlabel'], fontdict=font)
+
+    if attribute["xlim"][0] != attribute["xlim"][1]:
+        plt.xlim(attribute["xlim"][0], attribute["xlim"][1])
+    if attribute["y1lim"][0] != attribute["y1lim"][1]:
+        ax.set_ylim(attribute["y1lim"][0], attribute["y1lim"][1])
+    # print(test)
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    ax.spines['left'].set_color(color[0])
+    for i in range(len(ax.get_yticklabels())):
+        ax.get_yticklabels()[i].set_color(color[0])
+    ax.tick_params(which='minor',colors=color[0])
+    ax.tick_params(axis='y', color=color[0])
+
+    ax2 = ax.twinx()
+    line2 = ax2.semilogy(time, y2[0], ls="-", color=color[1], label=direc[1], linewidth=2)
+    if attribute["y2lim"][0] != attribute["y2lim"][1]:
+        plt.ylim(attribute["y2lim"][0], attribute["y2lim"][1])
+
+    font_tmp={
+    #   'family':'Cambria',
+      'size': 12, # corresponding to 10 pt
+      'weight': 'bold',
+      'color': color[1]
+    }
+
+    plt.ylabel(attribute['y2label'], labelpad=3, fontdict=font)
+    plt.yticks(size = 11)
+    plt.xticks(size = 11)
+
+    ax2.spines['right'].set_color(color[1])
+    for i in range(len(ax2.get_yticklabels())):
+        ax2.get_yticklabels()[i].set_color(color[1])
+    ax2.tick_params(which='minor',colors=color[1])
+    ax2.tick_params(axis='y', color=color[1])
+
+    lines = line1 + line2  
+    labels = [h.get_label() for h in lines]  
+    legend = plt.legend(lines, labels, loc='upper right', fontsize = 12, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.02, 1.16), fancybox=False)
+    ax = legend.get_frame()
+    # if len(direc) != 0:
+    #     legend = plt.legend(loc='upper right', fontsize = 12, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.02, 1.16), fancybox=False)
+    ax.set_alpha(1)
+    ax.set_facecolor('none')
+
+    ax = plt.gca()
+    # plt.xlabel(attribute["xlabel"], fontdict=font)
+    # ax.get_yticklabels().set_color("red")
+    plt.subplots_adjust(left=0.16, right=0.84, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    plt.savefig(save, transparent=True)
+    plt.show()
+
 
 def plotTrajWithError2D(gt_pos, error, attribute, save):
     plt.ioff()
@@ -893,67 +983,72 @@ def plotTrajWithError2D(gt_pos, error, attribute, save):
     # plt.xlabel("Epoch (sec)", fontdict=font)
     plt.savefig(save, transparent=True)
     plt.show()
-# # residual = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-03-08.txt"
-# calResPath_vio = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\20220308_no_loop.tum"
-# # gtPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-04-15.txt.gt"
-# # ipsRTKPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-04-15.txt.rtklib.gt"
 
-# # residual = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\error\2021-12-31.txt"
-# # calResPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\20211331-final.txt"
-# # gtPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2021-12-31.txt.gt"
-# # ipsRTKPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2021-12-31.txt.rtklib.gt"
+def plotCompareDot(error_dict = {}, attribute = {}, save="./"):
+    color = {3: [(63 / 255), (169 / 255), (245 / 255)],  # black
+         2: [(255 / 255), (146 / 255), (0 / 255)],  # red
+         1: [(0 / 255), (141 / 255), (0 / 255)],  # blue
+         0: [(229 / 255), (8 / 255), (106 / 255)],
+         4: [(20 / 255), (169 / 255), (89 / 255)],
+         5: [(70 / 255), (114 / 255), (196 / 255)]}  # green
 
-# residual = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-04-15.txt"
-# calResPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\20220415-final.txt"
-# gtPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-04-15.txt.gt"
-# ipsRTKPath = r"D:\文件\learn\01-本科\毕业设计\06-实验结果\evaluation\2022-04-15.txt.rtklib.gt"
+    # color = {3: [(63 / 255), (169 / 255), (245 / 255)],  # black
+    #      2: [(229 / 255), (87 / 255), (9 / 255)],  # red
+    #      1: [(28 / 255), (128 / 255), (65 / 255)],  # blue
+    #      0: [(80 / 255), (29 / 255), (138 / 255)],
+    #      4: [(20 / 255), (169 / 255), (89 / 255)],
+    #      5: [(70 / 255), (114 / 255), (196 / 255)]}  # green
 
-# # savefile_ar = residual.split('.')[0] + "_vel.tif"
-# # savefile_ar = residual.split('.')[0] + "_error.svg"
+    xmajorFormatter = FormatStrFormatter('%1.2f') #设置x轴标签文本的格式 
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    fig, ax = plt.subplots(1, 1, figsize=(3.4645669, 3.4645669))
+    direc = attribute['legend']
 
-# data = np.loadtxt(residual)
-# calRes = np.loadtxt(calResPath)
-# gts = np.loadtxt(gtPath, comments="#")
-# ips = np.loadtxt(ipsRTKPath, comments="%")
-# vio = np.loadtxt(calResPath_vio)
-# # vel = data[:, 1: 4]
+    min_x, min_y = attribute["xlim"][0], attribute["ylim"][0]
+    max_x, max_y = attribute["xlim"][1], attribute["ylim"][1]
+    plt.plot([min_x, max_x], [min_y, max_y], c="black", ls="-", linewidth=1, alpha=0.4)
+    i = 0
+    for label, compare_np in error_dict.items():
+        plt.scatter(compare_np[:, 0], compare_np[:, 1], marker="o", label=label, alpha=0.7, c=color[i], linewidths=0.6, edgecolors="black", s=60)
+        i += 1
 
-# neu_vio = []
-# for i in range(vio.shape[0]):
-#     neu_vio.append(coors.XYZ2NEU(calRes[0, 1: 4], vio[i,  1: 4]))
-# neu_vio = np.array(neu_vio)
+    # if len(direc) != 0:
+    #     for i in range(len(y)):
+    #         plt.semilogy(time, y[i], ls="-", color=color[i], label=direc[i], linewidth=2)
+    # else:
+    #     for i in range(len(y)):
+    #         plt.semilogy(time, y[i], ls="-", color=color[i], linewidth=2)
+    plt.ylabel(attribute['ylabel'], labelpad=3, fontdict=font)
+    # plt.ylim(-3, 3)
+    # plt.subplots_adjust(top=1)
+    plt.margins(x=0, y=0)
+    plt.grid(linestyle='-', color='k', alpha=0.2)
 
-# neu = []
-# for i in range(data.shape[0]):
-#     neu.append(coors.XYZ2NEU(data[0, 1: 4], data[i,  1: 4]))
-# neu = np.array(neu)
+    # if len(direc) != 0:
+    #     legend = plt.legend(loc='upper right', fontsize = 12, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.02, 1.16), fancybox=False)
+    #     ax = legend.get_frame()
+    ax.set_alpha(1)
+    ax.set_facecolor('none')
+    plt.xticks([0, 0.3, 0.6, 0.9, 1.2, 1.5], size = 11)
+    plt.yticks([0, 0.3, 0.6, 0.9, 1.2, 1.5], size = 11)
 
-# neu_traj = []
-# for i in range(calRes.shape[0]):
-#     neu_traj.append(coors.XYZ2NEU(calRes[0, 1: 4], calRes[i,  1: 4]))
-# neu_traj = np.array(neu_traj)
+    ax = plt.gca()
+    
+    if attribute["xlim"][0] != attribute["xlim"][1]:
+        plt.xlim(attribute["xlim"][0], attribute["xlim"][1])
+    if attribute["ylim"][0] != attribute["ylim"][1]:
+        plt.ylim(attribute["ylim"][0], attribute["ylim"][1])
+    # print(test)
+    ax = plt.gca()
+    # ax.set_aspect(1./ax.get_data_ratio(), adjustable='box')
+    ax.set_aspect(1)
 
-# neu_traj_gt = []
-# for i in range(gts.shape[0]):
-#     neu_traj_gt.append(coors.XYZ2NEU(calRes[0, 1: 4], gts[i,  1: 4]))
-# neu_traj_gt = np.array(neu_traj_gt)
-
-# neu_traj_ips = []
-# for i in range(ips.shape[0]):
-#     neu_traj_ips.append(coors.XYZ2NEU(calRes[0, 1: 4], ips[i,  1: 4]))
-# neu_traj_ips = np.array(neu_traj_ips)
-
-# time = data[:, 0]
-# time -= time[0]
-# neu_dict = {}
-# # neu_dict["RTD"] = neu_traj_ips
-# neu_dict["GroundTruth"] = neu_traj_gt
-# # neu_dict["VIO"] = neu_vio
-# neu_dict["GVIO"] = neu_traj
-
-
-# # plotVel(time, vel, savefile_ar)
-# # ploterror(time, neu, "savefile_ar")
-# plotTraj(neu_dict, r"D:\文件\learn\01-本科\毕业设计\06-实验结果\fig\traj_2022-03-08.svg")
-# # plotBox(neu=neu)
-
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    plt.xlabel(attribute["xlabel"], fontdict=font)
+    plt.savefig(save, transparent=True)
+    plt.show()
