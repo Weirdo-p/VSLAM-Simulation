@@ -241,9 +241,9 @@ class CLS:
                 frame = self.m_estimateFrame[i]
                 tec, Rec = frame.m_pos, frame.m_rota
                 features = frame.m_features
-                obsnum = len(features) * 3
-                R = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd
                 J, l = self.setMEQ_AllState(tec, Rec, features, camera, i)
+                obsnum = J.shape[0]
+                R = np.identity(obsnum) * self.m_PixelStd * self.m_PixelStd
                 W = np.linalg.inv(R)
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/H_FILTER_" + str(i) + ".txt", J)
                 # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/L_FILTER_" + str(i) + ".txt", l)
@@ -253,8 +253,10 @@ class CLS:
                 w += J.transpose() @ W @ l #+ self.m_StateCov @ state
 
             # self.m_StateCov = N
-            # np.savetxt("/home/xuzhuo/Documents/code/python/01-master/visual_simulation/log/COV_CLS.txt", np.linalg.inv(self.m_StateCov))
-            state = np.linalg.inv(N + self.m_StateCov) @ w
+            # np.savetxt("./log/N_Batch.txt", N + self.m_StateCov)
+            # np.savetxt("./log/b_Batch.txt", w)
+            state = np.linalg.inv(N + (self.m_StateCov)) @ w
+            # np.savetxt("./log/state_Batch.txt", state)
             # break
             # update current frame
             # FramedX = state[i * 6: i * 6 + 6, :]
@@ -270,15 +272,15 @@ class CLS:
             for j in range(len(self.m_estimateFrame)):  
                 self.m_estimateFrame[j].m_pos = self.m_estimateFrame[j].m_pos - state[j * 6: j * 6 + 3, :]
                 self.m_estimateFrame[j].m_rota = self.m_estimateFrame[j].m_rota @ (np.identity(3) - SkewSymmetricMatrix(state[j * 6 + 3: j * 6 + 6, :]))
-                self.m_estimateFrame[j].m_rota = UnitRotation(self.m_estimateFrame[j].m_rota)
+                self.m_estimateFrame[j].m_rota = np.real(UnitRotation(self.m_estimateFrame[j].m_rota))
 
             for id_ in self.m_MapPoints.keys():
 
                 position = self.m_MapPoints[id_]
                 self.m_MapPoints_Point[id_].m_pos -= state[StateFrameNum + position : StateFrameNum + position + 3]
             
-            if iteration != -1:
-                continue
+            # if iteration != -1:
+            #     continue
 
             if iter != 0:
                 print("test", np.linalg.norm(state[:StateFrameNum, :] - dXLast[:StateFrameNum, :], 2))
