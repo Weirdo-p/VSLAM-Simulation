@@ -1052,3 +1052,70 @@ def plotCompareDot(error_dict = {}, attribute = {}, save="./"):
     plt.xlabel(attribute["xlabel"], fontdict=font)
     plt.savefig(save, transparent=True)
     plt.show()
+
+
+def plotLineWithDot(xticks, error_dict = {}, attribute = {}, save="./"):
+    color = {3: [(63 / 255), (169 / 255), (245 / 255)],  # black
+         2: [(255 / 255), (102 / 255), (102 / 255)],  # red
+         1: [(0 / 255), (148 / 255), (255 / 255)],  # blue
+         0: [(0 / 255), (141 / 255), (0 / 255)],
+         4: [(20 / 255), (169 / 255), (89 / 255)],
+         5: [(70 / 255), (114 / 255), (196 / 255)]}  # green
+
+    # color = {3: [(63 / 255), (169 / 255), (245 / 255)],  # black
+    #      2: [(229 / 255), (87 / 255), (9 / 255)],  # red
+    #      1: [(28 / 255), (128 / 255), (65 / 255)],  # blue
+    #      0: [(80 / 255), (29 / 255), (138 / 255)],
+    #      4: [(20 / 255), (169 / 255), (89 / 255)],
+    #      5: [(70 / 255), (114 / 255), (196 / 255)]}  # green
+
+    xmajorFormatter = FormatStrFormatter('%1.2f') #设置x轴标签文本的格式 
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    fig, ax = plt.subplots(1, 1, figsize=(5.0393701, 3.4645669))
+    direc = attribute['legend']
+
+    min_x, min_y = attribute["xlim"][0], attribute["ylim"][0]
+    max_x, max_y = attribute["xlim"][1], attribute["ylim"][1]
+    for key, value in error_dict.items():
+        # plt.plot(xticks, value, ls="-", linewidth=1, marker='o', color=color[i])
+        plt.plot(xticks, value, ls="-", linewidth=1, marker='o')
+    # if len(direc) != 0:
+    #     for i in range(len(y)):
+    #         plt.semilogy(time, y[i], ls="-", color=color[i], label=direc[i], linewidth=2)
+    # else:
+    #     for i in range(len(y)):
+    #         plt.semilogy(time, y[i], ls="-", color=color[i], linewidth=2)
+    plt.ylabel(attribute['ylabel'], labelpad=3, fontdict=font)
+    # plt.ylim(-3, 3)
+    # plt.subplots_adjust(top=1)
+    # plt.margins(x=0, y=0)
+    plt.grid(linestyle='-', color='k', alpha=0.2)
+
+    # if len(direc) != 0:
+    #     legend = plt.legend(loc='upper right', fontsize = 12, edgecolor='black', numpoints=1, ncol=3, prop=font1, bbox_to_anchor=(1.02, 1.16), fancybox=False)
+    #     ax = legend.get_frame()
+    ax.set_alpha(1)
+    ax.set_facecolor('none')
+    plt.xticks(size = 11)
+    plt.yticks(size = 11)
+
+    ax = plt.gca()
+    
+    if attribute["xlim"][0] != attribute["xlim"][1]:
+        plt.xlim(attribute["xlim"][0], attribute["xlim"][1])
+    if attribute["ylim"][0] != attribute["ylim"][1]:
+        plt.ylim(attribute["ylim"][0], attribute["ylim"][1])
+    # print(test)
+    ax = plt.gca()
+    # ax.set_aspect(1./ax.get_data_ratio(), adjustable='box')
+    # ax.set_aspect(1)
+
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['right'].set_linewidth(1)
+    ax.spines['top'].set_linewidth(1)
+    plt.subplots_adjust(left=0.16, right=0.97, bottom=0.15, top=0.89, wspace=0.01, hspace=0.1)
+    plt.xlabel(attribute["xlabel"], fontdict=font)
+    plt.savefig(save, transparent=True)
+    plt.show()

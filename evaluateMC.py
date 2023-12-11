@@ -147,59 +147,59 @@ datapath = basepath + "data/"
 subfolders = sorted(os.listdir(datapath), key=lambda x : int(x))
 savepath = basepath + "results/" 
 
-#%% SWO and MSWF experiment
-SWO_file_name = "result.txt.-1s.CLS_SW_Marg1.Noise"
-MSWF_file_name = "result.txt.-1s.Filter_SW_Marg1.Noise"
+# #%% SWO and MSWF experiment
+# SWO_file_name = "result.txt.-1s.CLS_SW_Marg1.Noise"
+# MSWF_file_name = "result.txt.-1s.Filter_SW_Marg1.Noise"
 
-time, mean_rms_pos_swo, mean_rms_att_swo = evaluateRMS(subfolders, SWO_file_name)
-time, mean_rms_pos_mswf, mean_rms_att_mswf = evaluateRMS(subfolders, MSWF_file_name)
-SWO_MSWF_POS = np.array([mean_rms_pos_swo, mean_rms_pos_mswf]).transpose()
-SWO_MSWF_ATT = np.array([mean_rms_att_swo, mean_rms_att_mswf]).transpose()
+# time, mean_rms_pos_swo, mean_rms_att_swo = evaluateRMS(subfolders, SWO_file_name)
+# time, mean_rms_pos_mswf, mean_rms_att_mswf = evaluateRMS(subfolders, MSWF_file_name)
+# SWO_MSWF_POS = np.array([mean_rms_pos_swo, mean_rms_pos_mswf]).transpose()
+# SWO_MSWF_ATT = np.array([mean_rms_att_swo, mean_rms_att_mswf]).transpose()
 
-#%% SWO and normal SWF
-SWF_file_name = "result.txt.-1s.Filter_SW.Noise"
-time, mean_rms_pos_swf, mean_rms_att_swf = evaluateRMS(subfolders, SWF_file_name)
-SWO_SWF_POS = np.array([mean_rms_pos_swo, mean_rms_pos_swf]).transpose()
-SWO_SWF_ATT = np.array([mean_rms_att_swo, mean_rms_att_swf]).transpose()
+# #%% SWO and normal SWF
+# SWF_file_name = "result.txt.-1s.Filter_SW.Noise"
+# time, mean_rms_pos_swf, mean_rms_att_swf = evaluateRMS(subfolders, SWF_file_name)
+# SWO_SWF_POS = np.array([mean_rms_pos_swo, mean_rms_pos_swf]).transpose()
+# SWO_SWF_ATT = np.array([mean_rms_att_swo, mean_rms_att_swf]).transpose()
 
-# %% LSE vs. full-state EKF
-LSE_file_name = "result.txt.10s.CLS_Seq.Noise"
-time, mean_rms_pos_lse, mean_rms_att_lse = evaluateRMS(subfolders, LSE_file_name)
-EKF_file_name = "result.txt.10s.FilterAllState.Noise"
-time, mean_rms_pos_ekf, mean_rms_att_ekf = evaluateRMS(subfolders, EKF_file_name)
-BATCH_SEQ_POS = np.array([mean_rms_pos_lse, mean_rms_pos_ekf]).transpose()
-BATCH_SEQ_ATT = np.array([mean_rms_att_lse, mean_rms_att_ekf]).transpose()
+# # %% LSE vs. full-state EKF
+# LSE_file_name = "result.txt.10s.CLS_Seq.Noise"
+# time, mean_rms_pos_lse, mean_rms_att_lse = evaluateRMS(subfolders, LSE_file_name)
+# EKF_file_name = "result.txt.10s.FilterAllState.Noise"
+# time, mean_rms_pos_ekf, mean_rms_att_ekf = evaluateRMS(subfolders, EKF_file_name)
+# BATCH_SEQ_POS = np.array([mean_rms_pos_lse, mean_rms_pos_ekf]).transpose()
+# BATCH_SEQ_ATT = np.array([mean_rms_att_lse, mean_rms_att_ekf]).transpose()
 
-#%% plot
-dot_dict = {}
-print(SWO_MSWF_POS.shape)
-# print(np.array([mean_rms_pos_swo, mean_rms_pos_mswf]))
-dot_dict["SWO vs. SWF-SA"] = SWO_MSWF_POS
-dot_dict["Batch vs. Seq"] = BATCH_SEQ_POS
-dot_dict["SWO vs. SWF"] = SWO_SWF_POS
-logyAttributes = {}
-logyAttributes["ylabel"] = "RMS Of Filtering (m)"
-logyAttributes["xlabel"] = "RMS Of Optimization (m)"
-logyAttributes["legend"] = ["Attitude"]
-logyAttributes["xlim"] = [0, 0.6]
-logyAttributes["ylim"] = [0, 0.6]
+# #%% plot
+# dot_dict = {}
+# print(SWO_MSWF_POS.shape)
+# # print(np.array([mean_rms_pos_swo, mean_rms_pos_mswf]))
+# dot_dict["SWO vs. SWF-SA"] = SWO_MSWF_POS
+# dot_dict["Batch vs. Seq"] = BATCH_SEQ_POS
+# dot_dict["SWO vs. SWF"] = SWO_SWF_POS
+# logyAttributes = {}
+# logyAttributes["ylabel"] = "RMS Of Filtering (m)"
+# logyAttributes["xlabel"] = "RMS Of Optimization (m)"
+# logyAttributes["legend"] = ["Attitude"]
+# logyAttributes["xlim"] = [0, 0.6]
+# logyAttributes["ylim"] = [0, 0.6]
 
-# plotCompareDot(dot_dict, logyAttributes, "{0}results/total_pos.svg".format(basepath))
+# # plotCompareDot(dot_dict, logyAttributes, "{0}results/total_pos.svg".format(basepath))
 
-dot_dict = {}
-print(SWO_MSWF_POS.shape)
-# print(np.array([mean_rms_pos_swo, mean_rms_pos_mswf]))
-dot_dict["SWO vs. SWF-SA"] = SWO_MSWF_ATT
-dot_dict["Batch vs. Seq"] = BATCH_SEQ_ATT
-dot_dict["SWO vs. SWF"] = SWO_SWF_ATT
-logyAttributes = {}
-logyAttributes["ylabel"] = "RMS Of Filtering (deg)"
-logyAttributes["xlabel"] = "RMS Of Optimization (deg)"
-logyAttributes["legend"] = ["Attitude"]
-logyAttributes["xlim"] = [0, 1.5]
-logyAttributes["ylim"] = [0, 1.5]
+# dot_dict = {}
+# print(SWO_MSWF_POS.shape)
+# # print(np.array([mean_rms_pos_swo, mean_rms_pos_mswf]))
+# dot_dict["SWO vs. SWF-SA"] = SWO_MSWF_ATT
+# dot_dict["Batch vs. Seq"] = BATCH_SEQ_ATT
+# dot_dict["SWO vs. SWF"] = SWO_SWF_ATT
+# logyAttributes = {}
+# logyAttributes["ylabel"] = "RMS Of Filtering (deg)"
+# logyAttributes["xlabel"] = "RMS Of Optimization (deg)"
+# logyAttributes["legend"] = ["Attitude"]
+# logyAttributes["xlim"] = [0, 1.5]
+# logyAttributes["ylim"] = [0, 1.5]
 
-plotCompareDot(dot_dict, logyAttributes, "{0}results/total_att.svg".format(basepath))
+# plotCompareDot(dot_dict, logyAttributes, "{0}results/total_att.svg".format(basepath))
 
 #%%
 
@@ -236,31 +236,31 @@ SWO_file_name = "result.txt.-1s.CLS_SW_Marg1.Noise"
 
 time, mean_pos_mswf_swo, mean_att_mswf_swo = evaluateAveDiscrepancy(subfolders, SWO_file_name, MSWF_file_name)
 
-# define attribute
-logyAttributes = {}
-logyAttributes["y1label"] = "Position (m)"
-logyAttributes["y2label"] = "Attitude (deg)"
-logyAttributes["xlabel"] = "time (s)"
-logyAttributes["legend"] = ["Position", "Attitude"]
-logyAttributes["xlim"] = [0, 60]
-logyAttributes["y2lim"] = [1E-12, 1E-6]
-logyAttributes["y1lim"] = [1E-13, 1E-7]
-# plotLogY_Twiny(time - time[0], [mean_pos_mswf_swo], [mean_att_mswf_swo], savepath + "MSWF-SWO.svg", logyAttributes, False)
+# # define attribute
+# logyAttributes = {}
+# logyAttributes["y1label"] = "Position (m)"
+# logyAttributes["y2label"] = "Attitude (deg)"
+# logyAttributes["xlabel"] = "time (s)"
+# logyAttributes["legend"] = ["Position", "Attitude"]
+# logyAttributes["xlim"] = [0, 60]
+# logyAttributes["y2lim"] = [1E-12, 1E-6]
+# logyAttributes["y1lim"] = [1E-13, 1E-7]
+# # plotLogY_Twiny(time - time[0], [mean_pos_mswf_swo], [mean_att_mswf_swo], savepath + "MSWF-SWO.svg", logyAttributes, False)
 
 
-LSE_file_name = "result.txt.10s.CLS_Seq.Noise"
-EKF_file_name = "result.txt.10s.FilterAllState.Noise"
-time, mean_pos_lse_ekf, mean_att_lse_ekf = evaluateAveDiscrepancy(subfolders, LSE_file_name, EKF_file_name)
+# LSE_file_name = "result.txt.10s.CLS_Seq.Noise"
+# EKF_file_name = "result.txt.10s.FilterAllState.Noise"
+# time, mean_pos_lse_ekf, mean_att_lse_ekf = evaluateAveDiscrepancy(subfolders, LSE_file_name, EKF_file_name)
 
-logyAttributes = {}
-logyAttributes["y1label"] = "Position (m)"
-logyAttributes["y2label"] = "Attitude (deg)"
-logyAttributes["xlabel"] = "time (s)"
-logyAttributes["legend"] = ["Position", "Attitude"]
-logyAttributes["xlim"] = [0, 60]
-logyAttributes["y2lim"] = [1E-8, 1E-3]
-logyAttributes["y1lim"] = [1E-8, 1E-3]
-plotLogY_Twiny(time - time[0], [mean_pos_lse_ekf], [mean_att_lse_ekf], savepath + "fullstate.svg", logyAttributes, False)
+# logyAttributes = {}
+# logyAttributes["y1label"] = "Position (m)"
+# logyAttributes["y2label"] = "Attitude (deg)"
+# logyAttributes["xlabel"] = "time (s)"
+# logyAttributes["legend"] = ["Position", "Attitude"]
+# logyAttributes["xlim"] = [0, 60]
+# logyAttributes["y2lim"] = [1E-8, 1E-3]
+# logyAttributes["y1lim"] = [1E-8, 1E-3]
+# plotLogY_Twiny(time - time[0], [mean_pos_lse_ekf], [mean_att_lse_ekf], savepath + "fullstate.svg", logyAttributes, False)
 
 
 # logyAttributes = {}
@@ -271,19 +271,21 @@ plotLogY_Twiny(time - time[0], [mean_pos_lse_ekf], [mean_att_lse_ekf], savepath 
 # logyAttributes["ylim"] = [1E-13, 1E-7]
 # plotLogY(time - time[0], [mean_pos_mswf_swo], savepath + "MSWF-SWO-pos.svg", logyAttributes, False)
 
-# #%% SWO and normal SWF
-# SWF_file_name = "result.txt.-1s.Filter_SW.Noise"
-# time, mean_rms_pos_swf, mean_rms_att_swf = evaluateSWMarg(subfolders, SWF_file_name)
+#%% SWO and normal SWF
+SWF_file_name = "result.txt.-1s.Filter_SW.Noise"
+time, mean_pos_swf, mean_att_swf = evaluateAveDiscrepancy(subfolders, SWO_file_name, SWF_file_name)
 
-# posAttributes = {}
-# posAttributes["ylabel"] = "Position RMSE (m)"
-# posAttributes["xlabel"] = "time (s)"
-# posAttributes["legend"] = ["SWO", "SWF"]
-# posAttributes["xlim"] = [0, 60]
-# posAttributes["ylim"] = [-1, 1]
-# posAttributes["scientific"] = True
-# swf_swo_compare_pos = np.append(mean_rms_pos_swo.reshape(-1, 1), mean_rms_pos_swf.reshape(-1, 1), axis=1)
-# ploterror(time - time[0], swf_swo_compare_pos, savepath + "RMSE-SWO-SWF-pos.svg", posAttributes, False)
+# define attribute
+logyAttributes = {}
+logyAttributes["y1label"] = "Position (m)"
+logyAttributes["y2label"] = "Attitude (deg)"
+logyAttributes["xlabel"] = "time (s)"
+logyAttributes["legend"] = ["Position", "Attitude"]
+logyAttributes["xlim"] = [0, 60]
+logyAttributes["y2lim"] = [1E-7, 1E3]
+logyAttributes["y1lim"] = [1E-7, 1E3]
+
+plotLogY_Twiny(time - time[0], [mean_pos_swf], [mean_att_swf], savepath + "normal.svg", logyAttributes, False)
 
 # attAttributes = {}
 # attAttributes["ylabel"] = "Attitude RMSE (Deg)"
